@@ -33,4 +33,5 @@ logs/
 results/*
 !results/.gitkeep
 !results/README.md
+!results/runs.jsonl
 
