@@ -34,7 +34,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--show-schema", metavar="DB_ID", help="print one rendered schema")
     parser.add_argument("--facts-out", type=Path, default=None,
                         help="write per-question gold facts as jsonl")
+    parser.add_argument("--from-facts", type=Path, default=None,
+                        help="re-print the report from a previous --facts-out file, "
+                             "executing nothing")
     return parser.parse_args(argv)
+
+
+def read_facts(path: Path) -> list[GoldFacts]:
+    """Load per-question gold facts written by an earlier run."""
+    facts = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            facts.append(GoldFacts(**json.loads(line)))
+    return facts
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -62,23 +74,29 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n--- schema for {args.show_schema} ---")
         print(format_schema(schema, style="ddl"))
 
-    if not args.check_gold:
+    if args.from_facts:
+        # Re-print a report from a previous run. Executing nine thousand gold
+        # queries takes half an hour; losing the terminal should not cost that.
+        facts = read_facts(args.from_facts)
+        print(f"\nreplaying {len(facts)} gold results from {args.from_facts}")
+        print("(no queries executed)")
+    elif args.check_gold:
+        print("\nexecuting gold queries...")
+        facts = []
+        with SqlExecutor(timeout_s=args.timeout) as executor:
+            from concurrent.futures import ThreadPoolExecutor
+
+            def run(example):
+                result = executor.execute(split.db_path(example.db_id), example.gold_sql)
+                return gold_facts(example, result)
+
+            with ThreadPoolExecutor(max_workers=args.workers) as pool:
+                for done, item in enumerate(pool.map(run, examples), start=1):
+                    facts.append(item)
+                    if done % 200 == 0:
+                        print(f"  {done}/{len(examples)}", flush=True)
+    else:
         return 0
-
-    print("\nexecuting gold queries...")
-    facts: list[GoldFacts] = []
-    with SqlExecutor(timeout_s=args.timeout) as executor:
-        from concurrent.futures import ThreadPoolExecutor
-
-        def run(example):
-            result = executor.execute(split.db_path(example.db_id), example.gold_sql)
-            return gold_facts(example, result)
-
-        with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            for done, item in enumerate(pool.map(run, examples), start=1):
-                facts.append(item)
-                if done % 200 == 0:
-                    print(f"  {done}/{len(examples)}", flush=True)
 
     statuses = Counter(f.status for f in facts)
     surface = summarise(facts)
