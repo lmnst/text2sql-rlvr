@@ -37,8 +37,26 @@ def human(n: int) -> str:
     return f"{n / _MB:.1f} MB" if n < 4096 * _MB else f"{n / (1024 * _MB):.2f} GB"
 
 
-def download(url: str, target: Path) -> Path:
-    """Fetch ``url`` to ``target``, resuming a partial file if one is there."""
+def verify_zip(path: Path) -> str | None:
+    """Return ``None`` if the archive is intact, else why it is not.
+
+    Worth the CRC pass over the whole file. A resumed download whose seam is
+    misaligned still has a valid central directory at the end, so opening the
+    zip succeeds and only extraction fails -- several hundred megabytes later,
+    with an error that points at the zip module instead of at the download.
+    """
+    try:
+        with zipfile.ZipFile(path) as zf:
+            broken = zf.testzip()
+    except zipfile.BadZipFile as exc:
+        return f"not a valid zip ({exc})"
+    except OSError as exc:
+        return f"unreadable ({exc})"
+    return f"corrupt member {broken}" if broken else None
+
+
+def download(url: str, target: Path, *, allow_resume: bool = True) -> Path:
+    """Fetch ``url`` to ``target``, optionally resuming a partial file."""
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_suffix(target.suffix + ".part")
 
@@ -51,7 +69,7 @@ def download(url: str, target: Path) -> Path:
         return target
 
     have = partial.stat().st_size if partial.is_file() else 0
-    if have and total and have < total:
+    if allow_resume and have and total and have < total:
         print(f"  resuming at {human(have)} of {human(total)}")
     else:
         have = 0
@@ -64,10 +82,18 @@ def download(url: str, target: Path) -> Path:
     print(f"  downloading {url}")
     print(f"  size {human(total) if total else 'unknown'} -> {target}")
     with urllib.request.urlopen(request, timeout=120) as response:
-        mode = "ab" if have and response.status == 206 else "wb"
-        if mode == "wb":
+        resuming = have > 0 and response.status == 206
+        if resuming:
+            # Trust the server's answer, not our request: a proxy or CDN may
+            # serve a different range than the one we asked for, and appending
+            # it would corrupt the seam silently.
+            content_range = response.headers.get("Content-Range", "")
+            if not content_range.startswith(f"bytes {have}-"):
+                print(f"  server returned {content_range!r}, restarting from zero")
+                resuming = False
+        if not resuming:
             have = 0
-        with partial.open(mode) as handle:
+        with partial.open("ab" if resuming else "wb") as handle:
             done = have
             while chunk := response.read(1 * _MB):
                 handle.write(chunk)
@@ -81,6 +107,34 @@ def download(url: str, target: Path) -> Path:
 
     partial.replace(target)
     return target
+
+
+def fetch_archive(url: str, target: Path, *, force: bool = False, attempts: int = 2) -> Path:
+    """Download and verify, discarding and refetching once if verification fails."""
+    partial = target.with_suffix(target.suffix + ".part")
+    if force:
+        target.unlink(missing_ok=True)
+        partial.unlink(missing_ok=True)
+
+    for attempt in range(1, attempts + 1):
+        download(url, target, allow_resume=attempt == 1 and not force)
+        print("  verifying archive...")
+        problem = verify_zip(target)
+        if problem is None:
+            print("  archive ok")
+            return target
+
+        print(f"  ARCHIVE FAILED VERIFICATION: {problem}")
+        target.unlink(missing_ok=True)
+        partial.unlink(missing_ok=True)
+        if attempt < attempts:
+            print("  discarded; downloading again from scratch")
+
+    raise RuntimeError(
+        f"could not obtain an intact archive from {url} after {attempts} attempts. "
+        "The link to the Beijing OSS bucket may be too unreliable from here -- try "
+        "the HuggingFace mirror with --url, see docs/data.md."
+    )
 
 
 def extract_all(archive: Path, destination: Path, passes: int = 2) -> None:
@@ -114,15 +168,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--split", choices=sorted(URLS), default="mini_dev")
     parser.add_argument("--root", type=Path, default=Path("data/bird"))
     parser.add_argument("--keep-zip", action="store_true", help="do not delete the archive")
+    parser.add_argument("--url", help="download from a mirror instead of the official bucket")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="discard any existing or partial archive and download from scratch",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    url = URLS[args.split]
+    url = args.url or URLS[args.split]
 
     print(f"split {args.split}")
-    archive = download(url, args.root / Path(url).name)
+    try:
+        archive = fetch_archive(url, args.root / Path(url).name, force=args.force)
+    except RuntimeError as exc:
+        print(f"\n{exc}")
+        return 1
     extract_all(archive, args.root)
     if not args.keep_zip:
         archive.unlink(missing_ok=True)

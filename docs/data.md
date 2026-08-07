@@ -20,8 +20,21 @@ BIRD 的数据不进 Git（`.gitignore` 里 `data/` 已排除），需要自己�
 python scripts/download_bird.py --split mini_dev
 ```
 
-脚本会下载、解压（BIRD 把数据库压缩包套在外层压缩包里，需要解两层）、然后验证目录结构。
-断线可以直接重跑，会续传。dev 和 train 换 `--split` 即可，但**先只下 mini_dev**。
+脚本会下载、**校验压缩包完整性**、解压（BIRD 把数据库压缩包套在外层压缩包里，需要解两层）、
+然后验证目录结构。dev 和 train 换 `--split` 即可，但**先只下 mini_dev**。
+
+断线可以直接重跑，会续传。但续传接缝出错时，zip 的中央目录在文件末尾、仍然是好的，
+所以 `ZipFile()` 能正常打开，只有解压到中间某个成员时才炸——这个坑很隐蔽，
+所以脚本在解压前会对整个压缩包做一次 CRC 校验，发现损坏就丢弃重下一次。
+
+从德国拉阿里云北京的 bucket 本来就容易断，如果反复失败：
+
+```bash
+python scripts/download_bird.py --split mini_dev --force
+```
+
+`--force` 直接丢掉已有文件从头下。还不行的话用 `--url` 指向任意镜像的直链，
+或者走 HuggingFace 的 `birdsql/bird_mini_dev`（可配合 `HF_ENDPOINT=https://hf-mirror.com`）。
 
 官方下载地址（脚本内置，列在这里备查）：
 
