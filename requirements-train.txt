@@ -1,0 +1,30 @@
+# Training environment: Linux + NVIDIA GPU only. Do not install locally.
+#
+# STATUS: NOT YET PINNED. Nothing in this file has been installed or run.
+# Leaving it unpinned is the known risk documented in AGENTS.md, not an
+# oversight -- verl's trainer interfaces move fast enough that a version chosen
+# today without running it would be a guess dressed up as a lockfile.
+#
+# Fill it in like this, once, on the GPU box:
+#
+#   1. Install torch matching the box's CUDA, then vllm, then verl from source.
+#   2. Run verl's official gsm8k GRPO example end to end. Do not skip this --
+#      it separates "my reward function is wrong" from "my environment is wrong",
+#      and those two failures look identical from the logs.
+#   3. Only then: pip freeze > requirements-train.lock.txt, and record the verl
+#      commit sha and the lock date below.
+#
+# verl commit:  <fill in>
+# locked on:    <fill in>
+# CUDA / driver: <fill in>
+# GPU:          <fill in>
+
+torch
+vllm
+verl
+transformers
+accelerate
+peft
+datasets
+flash-attn
+wandb

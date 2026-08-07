@@ -1,0 +1,6 @@
+# Local development environment: data prep, SQL sandbox, verifier, evaluation.
+# Runs on Windows with CPython 3.10+ and no GPU. Deliberately does not include
+# torch -- if something here starts needing it, it belongs on the training side.
+httpx>=0.27
+pytest>=8
+ruff>=0.9
