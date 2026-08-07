@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Datasets, databases, and model artifacts
+data/
+*.sqlite
+*.sqlite3
+*.db
+checkpoints/
+models/
+wandb/
+outputs/
+logs/
+
+# Generated experiment artifacts
+results/*
+!results/.gitkeep
+!results/README.md
+
