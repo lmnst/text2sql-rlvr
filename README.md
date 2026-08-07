@@ -14,6 +14,10 @@ rendering, prompting, sandboxed execution, the verifier, and Execution Accuracy 
 
 **No experiments have been run and no model has been trained.** There are no results to report.
 
+[docs/PROGRESS.md](docs/PROGRESS.md) is the running log, in Chinese: what each milestone built,
+why it was designed that way, and which conclusions are still unverified. Start there if you are
+new to the project.
+
 ## Two verifiers, deliberately
 
 Every evaluation reports two numbers over the same run:
