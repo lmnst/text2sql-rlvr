@@ -14,10 +14,28 @@ BIRD 的数据不进 Git（`.gitignore` 里 `data/` 已排除），需要自己�
 
 划分纪律见 AGENTS.md「数据划分纪律」。简单说：训练期间只碰 train，dev 不参与任何选择。
 
+## 下载
+
+```bash
+python scripts/download_bird.py --split mini_dev
+```
+
+脚本会下载、解压（BIRD 把数据库压缩包套在外层压缩包里，需要解两层）、然后验证目录结构。
+断线可以直接重跑，会续传。dev 和 train 换 `--split` 即可，但**先只下 mini_dev**。
+
+官方下载地址（脚本内置，列在这里备查）：
+
+| 划分 | URL |
+|---|---|
+| mini_dev | `https://bird-bench.oss-cn-beijing.aliyuncs.com/minidev.zip` |
+| dev | `https://bird-bench.oss-cn-beijing.aliyuncs.com/dev.zip` |
+| train | `https://bird-bench.oss-cn-beijing.aliyuncs.com/train.zip` |
+
+HuggingFace 上也有镜像（`birdsql/bird_mini_dev`），国内如果 OSS 直连慢可以走那边。
+
 ## 目录结构
 
-从 [BIRD 官网](https://bird-bench.github.io/) 和 mini-dev 的官方仓库下载并解压，
-最终应该长这样（`data/bird` 只是默认路径，可以用 `--root` 改）：
+解压后应该长这样（`data/bird` 只是默认路径，可以用 `--root` 改）：
 
 ```text
 data/bird/
