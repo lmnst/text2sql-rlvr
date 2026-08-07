@@ -36,6 +36,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--checkpoint", default="", help="checkpoint path or model id")
     parser.add_argument("--config-path", default="", help="training config this run came from")
     parser.add_argument("--notes", default="")
+    parser.add_argument(
+        "--only-predicted",
+        action="store_true",
+        help="score only the questions present in --predictions. For smoke tests: a "
+             "partial run scored against the full split reports a meaningless number.",
+    )
     parser.add_argument("--outcomes", type=Path, default=None, help="per-example jsonl output")
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--no-ledger", action="store_true", help="print only, record nothing")
@@ -96,6 +102,13 @@ def main(argv: list[str] | None = None) -> int:
     predictions = load_predictions(args.predictions)
     meta = load_meta(args.predictions)
 
+    subset = "full_split"
+    if args.only_predicted:
+        examples = [e for e in examples if e.question_id in predictions]
+        subset = "only_predicted"
+        print(f"PARTIAL RUN: scoring {len(examples)} of {len(split.load())} questions.")
+        print("This number is not comparable to a full-split result.\n")
+
     with SqlExecutor(timeout_s=args.timeout) as executor:
         report = evaluate(
             examples,
@@ -129,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
             "config_path": args.config_path,
             "command": " ".join(sys.argv),
             "order_policy": args.order_policy,
+            "eval_subset": subset,
             "metrics": report.metrics(),
             "log_path": str(outcomes_path),
             "notes": args.notes,
