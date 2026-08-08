@@ -9,14 +9,19 @@ read-only databases and scored with verifiable rewards.
 
 ## Status
 
-Steps 1 and 2 of the plan in `AGENTS.md` are implemented and tested: BIRD loading, schema
-rendering, prompting, sandboxed execution, the verifier, and Execution Accuracy evaluation.
+The data, evaluation, read-only execution, verifier, baseline, and LoRA SFT stages are implemented
+and recorded. The tracked experiment ledger currently reports:
 
-**No experiments have been run and no model has been trained.** There are no results to report.
+- Qwen3-1.7B baseline on BIRD Mini-Dev (500 examples): 19.80% official EX, 17.40% strict EX.
+- One-epoch LoRA SFT: 34.60% official EX, 30.00% strict EX.
 
-[docs/PROGRESS.md](docs/PROGRESS.md) is the running log, in Chinese: what each milestone built,
-why it was designed that way, and which conclusions are still unverified. Start there if you are
-new to the project.
+The current gate is the first GRPO smoke test on AutoDL. It has not completed, so there are no
+GRPO or reward-hacking results. The recent commits document environment failures and candidate
+configuration fixes, not a successful training run.
+
+Start with [HANDOFF.md](HANDOFF.md) for the exact continuation point and
+[docs/PROGRESS.md](docs/PROGRESS.md) for the evidence-backed milestone history. Project rules and
+data-split discipline are in [AGENTS.md](AGENTS.md).
 
 ## Two verifiers, deliberately
 
@@ -80,9 +85,10 @@ results/                      runs.jsonl is tracked; everything else is ignored
 
 ## Remaining plan
 
-3. Qwen3-1.7B baseline on Mini-Dev, then dev.
-4. LoRA SFT and evaluation.
-5. verl GRPO with the strict verifier as reward; smoke test before a real run.
-6. Ablations (clip-higher, dynamic sampling) and error analysis.
+1. Pass the three-step GRPO smoke test on the pinned AutoDL environment.
+2. Run GRPO with the strict verifier as reward and evaluate on validation before Mini-Dev.
+3. Run the matched naive-reward control with execution partial credit.
+4. Compare rollout hack rates, then decide which ablations and error analyses are justified.
 
-Conventions, data-split discipline and the reporting rules are in `AGENTS.md`.
+The operational continuation point is in `HANDOFF.md`. Conventions, data-split discipline and
+reporting rules are in `AGENTS.md`.
