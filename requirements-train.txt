@@ -14,25 +14,33 @@
 #   3. Only then: pip freeze > requirements-train.lock.txt, and record the verl
 #      commit sha and the lock date below.
 #
-# verl:         v0.8.0  (released 2026-06-01)
+# verl:         4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71  (0.9.0.dev0)
+#               plus `++transfer_queue.enable=False` on the command line
 # GPU:          single RTX 4090 24GB, AutoDL
 # CUDA / driver: <fill in>
+# STATUS:       not yet confirmed working end to end
 #
-# History, because it is the point of this file:
+# History, because this is the point of the file:
 #
-# 2026-08-08  Cloned verl at HEAD (4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71)
-#             because the runbook said `git clone`, not `git checkout <tag>`.
-#             Config validation passed and Ray started, then the run died on
-#             `ModuleNotFoundError: No module named 'transfer_queue'` -- HEAD
-#             carried a half-landed refactor whose task runner imports a data
-#             component that is not a dependency yet.
+# 2026-08-08  Cloned verl at HEAD (4a2cba7) -- the runbook said `git clone`,
+#             not `git checkout <tag>`, despite AGENTS.md requiring a pin since
+#             day one. Config validation passed and Ray started, then the run
+#             died on `ModuleNotFoundError: No module named 'transfer_queue'`:
+#             HEAD carries a data component that the task runner imports but
+#             that is not a dependency yet. It is switchable off.
 #
-#             AGENTS.md has said "pin verl to a specific commit" since day one.
-#             The instruction was written and then not followed. Moving to a
-#             released tag.
+# 2026-08-08  Moved to the v0.8.0 tag to "fix" that. Worse: `pip install -e .`
+#             resolved numpy down from 2.3.2 to 1.26.4, which broke scipy,
+#             opencv and transformers. A working environment with one bad import
+#             was traded for a broken environment.
 #
-# The rest of this file is still unpinned. Run `pip freeze > requirements-train.lock.txt`
-# once a GRPO run has completed end to end, and record the CUDA version here.
+#             Lesson, and it is not the obvious one: pinning matters, but
+#             changing a pin *inside a working environment* is itself a
+#             dependency change. Reverted to the HEAD commit with
+#             `pip install --no-deps -e .` and numpy restored explicitly.
+#
+# Once a GRPO run completes end to end: `pip freeze > requirements-train.lock.txt`,
+# record the CUDA version above, and change STATUS.
 
 torch
 vllm

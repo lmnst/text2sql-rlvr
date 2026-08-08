@@ -69,19 +69,35 @@ llamafactory-cli export --model_name_or_path /root/autodl-tmp/Qwen3-1.7B --adapt
 **这一步不要跳。** 它把"我的奖励函数写错了"和"我的环境装坏了"这两种情况分开——
 这两者的报错长得一模一样。
 
-**装发布版本，不要装 HEAD。**
-
 ```bash
 git clone https://github.com/volcengine/verl /root/verl
-cd /root/verl && git checkout v0.8.0 && pip install -e .
+cd /root/verl && git checkout 4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71 && pip install -e .
 ```
 
-这一条是用一次失败换来的：第一次按 `git clone` 直接拿了 HEAD，
-配置校验全过、Ray 也起来了，然后死在
-`ModuleNotFoundError: No module named 'transfer_queue'`——
-HEAD 上有个没落地完的重构，其任务运行器 import 了一个还不是依赖的组件。
+这个 commit 上有个新加的数据组件 `transfer_queue`，任务运行器会 import 它，
+但它还不是依赖。**用命令行关掉即可**，见第 5 步。
 
-AGENTS.md 从第一天就写着"verl 必须钉到具体版本"。规则写了，然后没照做。
+### 这一段是踩过两次坑之后写的
+
+第一次：手册写的是 `git clone`，拿到 HEAD，跑到一半死于
+`ModuleNotFoundError: No module named 'transfer_queue'`。
+AGENTS.md 从第一天就要求钉版本，规则写了没照做。
+
+第二次（更糟）：为了"修好"它去 checkout 了 v0.8.0 标签，
+`pip install -e .` 把 numpy 从 2.3.2 降到 1.26.4，
+连带 scipy、opencv、transformers 全部报错——
+**用一个只有一处导入问题的可用环境，换来了一个彻底坏掉的环境。**
+
+真正的教训不是"要钉版本"，而是：**在一个已经能跑的环境里改版本，
+本身就是一次依赖变更。** 恢复方式是回到原 commit 并显式保护依赖：
+
+```bash
+cd /root/verl && git checkout 4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71
+pip install --no-deps -e .
+pip install "numpy==2.3.2"
+```
+
+`--no-deps` 是重点：只刷新 verl 本身，不让它重新解析并改动别的包。
 
 按 verl 官方 README 跑通它自带的 gsm8k GRPO 例子，再往下走。
 
@@ -144,8 +160,13 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 ```
 
 ```bash
-/root/autodl-tmp/run_smoke.sh
+/root/autodl-tmp/run_smoke.sh ++transfer_queue.enable=False
 ```
+
+**两个加号。** Hydra 里 `+key=value` 表示"新增一个原本不存在的键"，
+而这个键已经存在，覆盖已有的键要用 `++`。写成一个加号会报
+`Could not append to config. An item is already at ...`，
+报错里其实已经给出了答案。
 
 这一步专门用来发现配置问题。verl 的配置在版本间会变，前几次报错是正常的，
 按下表自己处理，处理不了再贴出来。
