@@ -143,8 +143,21 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 /root/autodl-tmp/run_smoke.sh
 ```
 
-这一步专门用来发现"配置项名字对不对"。verl 的配置键在版本间会变，
-报错通常是 `Could not override 'xxx'` 这种，把原文贴出来，改一个词就好。
+这一步专门用来发现配置问题。verl 的配置在版本间会变，前几次报错是正常的，
+按下表自己处理，处理不了再贴出来。
+
+| 报错 | 含义 | 处理 |
+|---|---|---|
+| `Please set at least one of 'X' or 'X_per_gpu'` | 这个键存在但默认为空，必须显式设 | 在脚本里加 `X_per_gpu=1` |
+| `Could not override 'xxx'` | 这个键在当前版本**不存在** | 去 verl 的 `trainer/config/` 里找对应新名字 |
+| `CUDA out of memory` | 显存不够 | 依次降 `rollout.gpu_memory_utilization`、`rollout.n`、`data.train_batch_size` |
+| 卡在加载模型不动 | 通常在编译或初始化 vLLM | 等几分钟；超过十分钟再看日志 |
+
+**注意区分前两种。** 第一种说明键名是对的、只是没赋值，加上即可；
+第二种说明键名在这个版本里改掉了，得去源码里查。二者的处理方式完全不同。
+
+`log_prob_micro_batch_size_per_gpu` 在 `actor_rollout_ref` 下有三处
+（`actor`、`rollout`、`ref`），三处都要设，缺一处就报第一种错。
 
 跑完检查奖励日志确实产生了：
 

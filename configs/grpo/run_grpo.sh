@@ -50,6 +50,7 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
   actor_rollout_ref.rollout.max_model_len=8704 \
   actor_rollout_ref.rollout.load_format=safetensors \
+  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
   custom_reward_function.path=/root/autodl-tmp/verl_reward.py \
   custom_reward_function.name=compute_score \
