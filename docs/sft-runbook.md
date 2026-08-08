@@ -38,17 +38,32 @@ configs/sft/dataset.json           这份数据是怎么来的（提示词配置
 
 **截断为什么危险**：被截掉的是序列末尾，而末尾正是答案。那些样本会教模型"什么都不要输出"。
 
-## 第 2 步：把数据和代码传上去
+## 第 2 步：把数据和配置传上去
 
-开机后（这次要带卡），在你本地终端：
+**注意：scp 要在你自己电脑上跑，不是在 ssh 进去的云端终端里跑。**
+提示符如果是 `root@autodl-container-...` 就说明跑错地方了。
+
+先在**云上**建目录：
 
 ```bash
-scp -P 端口号 data/processed/sft_train.jsonl root@你的地址:/root/autodl-tmp/sft_data/
+mkdir -p /root/autodl-tmp/sft_data
 ```
 
-（先在云上 `mkdir -p /root/autodl-tmp/sft_data`）
+然后回到**本地**，另开一个 PowerShell 窗口（不要用打隧道那个）：
 
-只需要传这一个文件，约 40 MB。数据库不用传——SFT 阶段不执行 SQL。
+```bash
+cd D:\Code\Demo\text2sql-rlvr
+```
+
+```bash
+scp -P 端口号 data/processed/sft_train.jsonl configs/sft/dataset_info_entry.json root@你的地址:/root/autodl-tmp/sft_data/
+```
+
+```bash
+scp -P 端口号 configs/sft/qwen3_1.7b_lora.yaml root@你的地址:/root/autodl-tmp/
+```
+
+一共约 32 MB。数据库不用传——SFT 阶段不执行 SQL。
 
 ## 第 3 步：装 LLaMA-Factory 并注册数据集
 
@@ -56,8 +71,11 @@ scp -P 端口号 data/processed/sft_train.jsonl root@你的地址:/root/autodl-t
 pip install llamafactory[torch,metrics]
 ```
 
-把 `configs/sft/dataset_info_entry.json` 的内容合并进
-`/root/autodl-tmp/sft_data/dataset_info.json`（如果这个文件不存在就直接新建，内容就是那一段）。
+`dataset_info_entry.json` 本身就是一份完整可用的 `dataset_info.json`，在**云上**改个名即可：
+
+```bash
+mv /root/autodl-tmp/sft_data/dataset_info_entry.json /root/autodl-tmp/sft_data/dataset_info.json
+```
 
 ## 第 4 步：先用 32 条样本跑两分钟
 
