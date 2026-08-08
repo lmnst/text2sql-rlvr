@@ -181,7 +181,8 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 | 卡在加载模型不动 | 通常在编译或初始化 vLLM | 等几分钟；超过十分钟再看日志 |
 | `Could not append to config. An item is already at 'X'` | 用了 `+X=` 但 X 已存在 | 改用 `++X=`（覆盖）或直接 `X=` |
 | `ModuleNotFoundError` 出现在 verl 自己的文件里 | verl 该版本的某条代码路径依赖了未安装的东西 | 找配置开关绕开**整条路径**；`import` 早于配置生效，关不掉 |
-| `FlashAttention2 has been toggled on, but ... doesn't seem to be installed` | 模型的 `config.json` 里指定了 FA2 | 把 `config.json` 里的 `attn_implementation` 改成 `sdpa`，或加 `actor_rollout_ref.model.override_config.attn_implementation=sdpa` |
+| `FlashAttention2 has been toggled on, but ... doesn't seem to be installed` | 模型的 `config.json` 里指定了 FA2 | 把 `config.json` 里的 `attn_implementation` 改成 `sdpa`，或加 `+actor_rollout_ref.model.override_config.attn_implementation=sdpa` |
+| `cumem allocator is not supported on current platform` | vLLM 的睡眠模式需要 CUDA 虚拟内存接口，容器环境不支持 | 加 `actor_rollout_ref.rollout.free_cache_engine=False`；代价是训练时 vLLM 不释放显存，可能要把 `gpu_memory_utilization` 降到 0.3 |
 
 ### 每次崩溃之后，先清理再重试
 
