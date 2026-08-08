@@ -60,10 +60,16 @@ scp -P 端口号 data/processed/sft_train.jsonl configs/sft/dataset_info_entry.j
 ```
 
 ```bash
-scp -P 端口号 configs/sft/qwen3_1.7b_lora.yaml root@你的地址:/root/autodl-tmp/
+scp -P 端口号 configs/sft/qwen3_1.7b_lora.yaml configs/sft/qwen3_1.7b_lora_smoke.yaml root@你的地址:/root/autodl-tmp/
 ```
 
 一共约 32 MB。数据库不用传——SFT 阶段不执行 SQL。
+
+传完在**云上**确认三个文件都到位，再往下走：
+
+```bash
+ls -la /root/autodl-tmp/sft_data/ /root/autodl-tmp/*.yaml
+```
 
 ## 第 3 步：装 LLaMA-Factory 并注册数据集
 
@@ -81,13 +87,17 @@ mv /root/autodl-tmp/sft_data/dataset_info_entry.json /root/autodl-tmp/sft_data/d
 
 **不要直接开全量训练。**
 
-把 `configs/sft/qwen3_1.7b_lora.yaml` 传上去，然后：
-
 ```bash
-llamafactory-cli train /root/autodl-tmp/qwen3_1.7b_lora.yaml --max_samples 32 --num_train_epochs 1 --output_dir /root/autodl-tmp/out/smoke
+llamafactory-cli train /root/autodl-tmp/qwen3_1.7b_lora_smoke.yaml
 ```
 
 看到 loss 在下降、没有报错，就说明环境和数据格式都对。
+
+**注意不要给这条命令加命令行参数。** llamafactory-cli 传了 yaml 之后，
+会把 yaml 当作完整的参数集合，额外的 `--max_samples` 之类会被判为多余参数并报错
+（`Some keys are not used by the HfArgumentParser`）。所以冒烟用的是一个单独的配置文件，
+除了四行标了 `smoke only` 的之外，其余与正式配置逐行相同——
+一个跑在不同配置上的冒烟测试，证明不了正式配置能跑。
 
 配置里有两处标了 `VERIFY`，就是在这一步确认：
 

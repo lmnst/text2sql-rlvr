@@ -1,0 +1,53 @@
+# Two-minute smoke run: 32 samples, just enough to prove the pipeline works.
+#
+# Separate file rather than command-line overrides, because llamafactory-cli
+# parses the yaml as the complete argument set and rejects extra CLI flags
+# alongside it ("Some keys are not used by the HfArgumentParser").
+#
+# Everything below must stay identical to qwen3_1.7b_lora.yaml except the four
+# marked lines -- a smoke test that exercises a different configuration proves
+# nothing about the real one.
+
+### model
+model_name_or_path: /root/autodl-tmp/Qwen3-1.7B
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+lora_target: all
+
+### dataset
+dataset: text2sql_sft
+dataset_dir: /root/autodl-tmp/sft_data
+template: qwen3
+enable_thinking: false
+cutoff_len: 8192
+overwrite_cache: true
+preprocessing_num_workers: 8
+max_samples: 32                                    # smoke only
+
+### output
+output_dir: /root/autodl-tmp/out/smoke             # smoke only
+logging_steps: 1                                   # smoke only
+save_steps: 1000000
+plot_loss: false
+overwrite_output_dir: true
+report_to: none
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 1.0e-4
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+bf16: true
+gradient_checkpointing: true
+
+### no held-out slice: 1% of 32 samples is not a measurement
+val_size: 0.0                                      # smoke only
