@@ -183,6 +183,34 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 | `ModuleNotFoundError` 出现在 verl 自己的文件里 | verl 该版本的某条代码路径依赖了未安装的东西 | 找配置开关绕开**整条路径**；`import` 早于配置生效，关不掉 |
 | `FlashAttention2 has been toggled on, but ... doesn't seem to be installed` | 模型的 `config.json` 里指定了 FA2 | 把 `config.json` 里的 `attn_implementation` 改成 `sdpa`，或加 `actor_rollout_ref.model.override_config.attn_implementation=sdpa` |
 
+### 每次崩溃之后，先清理再重试
+
+**这一条是最容易被忽略、代价却最大的。**
+
+verl 通过 Ray 启动 worker 进程。训练崩溃时，这些 worker **不一定会跟着退出**，
+而它们还占着显存。连续调试几次之后，显卡会被这些残留进程占满，
+下一次运行就会报出看起来毫不相干的错误：
+
+```
+Failed to CUDA calloc async 608 bytes
+ncclUnhandledCudaError: Call to CUDA function failed.
+```
+
+**608 字节分配失败**——不是模型太大，是显卡上一点空间都不剩了。
+这个报错指向 NCCL 和 FSDP，很容易被误判成分布式配置问题，
+实际原因只是上一次崩溃没清干净。
+
+所以：**每次报错之后、重试之前，先跑这一串。**
+
+```bash
+ray stop --force; pkill -9 -f ray::; pkill -9 -f vllm; sleep 3; nvidia-smi
+```
+
+`nvidia-smi` 里显存占用应该回到接近 0，进程列表应为空。不为空就再执行一次。
+
+判断依据很简单：**报错里的数字小得离谱（几百字节、几 KB），
+就不是"不够用"，而是"什么都不剩"。**
+
 **不要为此去装 flash-attn。** 它编译常需半小时，且对 torch / CUDA 版本敏感，
 很容易触发又一轮依赖连锁反应。`sdpa` 是 PyTorch 自带实现，
 1.7B 这个规模用它只是稍慢，精度没有差别。
