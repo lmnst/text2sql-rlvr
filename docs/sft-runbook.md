@@ -4,6 +4,25 @@
 
 基线（未训练，mini-dev 500 题，提示词 v1）：**官方口径 19.80%**。
 
+## 每一步的可信度
+
+这份手册不是实测记录，是计划。下表说明每一步的依据强度，
+碰到与描述不符的情况时先看这里，再决定是照着改还是停下来问。
+
+| 步骤 | 依据 | 出问题的概率 |
+|---|---|---|
+| 1 生成训练数据 | **已在本地实际跑过**，输出与统计都是真的 | 无 |
+| 2 传文件 | 普通 scp | 低（易错点是跑错机器，见步骤内说明） |
+| 3 装框架、注册数据集 | 安装已实测可用；**数据集注册格式未验证** | 中 |
+| 4 冒烟训练 | 配置从未被框架加载过 | **中高** |
+| 5 验证对话模板 | transformers 标准接口 | 低 |
+| 6 正式训练 | 超参是有依据的起点，**非实测**；耗时为估算 | 中 |
+| 7 起服务加载适配器 | vLLM 的 LoRA 参数**未实测** | **中高** |
+| 8 生成与评测 | **这两个脚本已跑通过完整基线**，命令是可靠的 | 低 |
+
+第 4、7 步是最可能卡住的地方，都是"框架参数对不对"的问题，报错原文贴出来就能定位。
+第 1、8 步是实测过的，可以放心。
+
 ## 先理解这一步在干什么
 
 前面的基线是"模型凭自己的常识做题"。SFT 是给它看 8191 道题的标准答案，让它模仿。
@@ -141,10 +160,23 @@ llamafactory-cli train /root/autodl-tmp/qwen3_1.7b_lora.yaml
 LoRA 训练出来的是一个小的适配器，不是完整模型。vLLM 可以直接加载：
 
 ```bash
-vllm serve /root/autodl-tmp/Qwen3-1.7B --served-model-name Qwen3-1.7B-sft --port 8000 --max-model-len 8192 --gpu-memory-utilization 0.9 --enable-lora --lora-modules sft=/root/autodl-tmp/out/qwen3-1.7b-sft-lora
+vllm serve /root/autodl-tmp/Qwen3-1.7B --served-model-name Qwen3-1.7B --port 8000 --max-model-len 8192 --gpu-memory-utilization 0.9 --enable-lora --max-lora-rank 32 --lora-modules sft=/root/autodl-tmp/out/qwen3-1.7b-sft-lora
 ```
 
+**`--max-lora-rank 32` 不能省。** vLLM 这个参数默认是 16，而训练配置里用的秩是 32，
+不显式抬高会在加载适配器时直接失败。两个数字必须一致：改了 `lora_rank` 就要同步改这里。
+
 然后本地打隧道（和之前一样），调用时**模型名用 `sft`**（就是 `--lora-modules` 里等号左边那个）。
+
+起来之后先确认适配器真的挂上了：
+
+```bash
+curl http://localhost:8000/v1/models
+```
+
+返回的列表里应该**同时**有 `Qwen3-1.7B` 和 `sft` 两个条目。只有前者说明适配器没加载成功，
+这时候继续跑评测，测的是没训练过的原模型，分数会和基线一模一样——
+这种失败不会报错，只会让你以为训练没效果。
 
 ## 第 8 步：先评验证集，再评 mini-dev
 
