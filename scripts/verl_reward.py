@@ -1,0 +1,146 @@
+"""Reward entry point for verl.
+
+Point verl at this file:
+
+    custom_reward_function.path=/root/autodl-tmp/verl_reward.py
+    custom_reward_function.name=compute_score
+
+Configuration is read from the environment rather than baked in, so the same
+file serves the honest run and the deliberate reward-hacking run without an edit
+that would have to be remembered and undone:
+
+    TEXT2SQL_DB_ROOT          required, the *_databases directory
+    TEXT2SQL_REWARD_FORMAT    format bonus, default 0
+    TEXT2SQL_REWARD_EXEC      bonus for SQL that merely runs, default 0
+    TEXT2SQL_REWARD_OFFICIAL  "1" to score with BIRD's set comparison
+    TEXT2SQL_REWARD_TIMEOUT   seconds, default 10
+    TEXT2SQL_ROLLOUT_LOG      jsonl path; every rollout's breakdown is appended
+
+The rollout log is the important one. It makes the hacking measurement
+independent of what verl does or does not do with the return value: whatever
+version is installed, the per-rollout record lands in a file we control and can
+analyse afterwards.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import threading
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from text2sql_rlvr.rewards.reward import (  # noqa: E402
+    RewardConfig,
+    RewardStats,
+    compute_reward,
+)
+from text2sql_rlvr.rewards.sandbox import SqlExecutor  # noqa: E402
+
+
+def _flag(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes"}
+
+
+_CONFIG = RewardConfig(
+    format_bonus=float(os.environ.get("TEXT2SQL_REWARD_FORMAT", "0")),
+    execution_bonus=float(os.environ.get("TEXT2SQL_REWARD_EXEC", "0")),
+    use_official=_flag("TEXT2SQL_REWARD_OFFICIAL"),
+    order_policy=os.environ.get("TEXT2SQL_ORDER_POLICY", "ignore"),
+)
+
+# One executor per process: connections are per-thread and results are cached,
+# which is what keeps reward computation from becoming the training bottleneck.
+_EXECUTOR = SqlExecutor(timeout_s=float(os.environ.get("TEXT2SQL_REWARD_TIMEOUT", "10")))
+
+_STATS = RewardStats()
+_LOG_PATH = os.environ.get("TEXT2SQL_ROLLOUT_LOG", "")
+_LOG_LOCK = threading.Lock()
+_LOG_EVERY = int(os.environ.get("TEXT2SQL_LOG_FLUSH_EVERY", "200"))
+_BUFFER: list[str] = []
+
+
+def _db_path(extra_info: dict | None) -> Path:
+    root = os.environ.get("TEXT2SQL_DB_ROOT")
+    if not root:
+        raise RuntimeError("TEXT2SQL_DB_ROOT is not set; the reward cannot find the databases")
+    db_id = (extra_info or {}).get("db_id")
+    if not db_id:
+        raise RuntimeError(f"extra_info has no db_id: {extra_info!r}")
+    return Path(root) / db_id / f"{db_id}.sqlite"
+
+
+def _record(payload: dict) -> None:
+    if not _LOG_PATH:
+        return
+    with _LOG_LOCK:
+        _BUFFER.append(json.dumps(payload, ensure_ascii=False))
+        if len(_BUFFER) >= _LOG_EVERY:
+            path = Path(_LOG_PATH)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write("\n".join(_BUFFER) + "\n")
+            _BUFFER.clear()
+
+
+def compute_score(
+    data_source: str,
+    solution_str: str,
+    ground_truth: str,
+    extra_info: dict | None = None,
+    **_kwargs: object,
+) -> float:
+    """Score one rollout. Returns a plain float, which every verl version accepts."""
+    try:
+        breakdown = compute_reward(
+            solution_str,
+            ground_truth,
+            _db_path(extra_info),
+            executor=_EXECUTOR,
+            config=_CONFIG,
+        )
+    except Exception as exc:  # noqa: BLE001 - a broken reward must not kill training
+        _record({"error": f"{type(exc).__name__}: {exc}", "extra_info": extra_info})
+        return 0.0
+
+    with _LOG_LOCK:
+        _STATS.update(breakdown)
+
+    payload = breakdown.as_dict()
+    payload["question_id"] = (extra_info or {}).get("question_id")
+    payload["db_id"] = (extra_info or {}).get("db_id")
+    payload["data_source"] = data_source
+    _record(payload)
+
+    return float(breakdown.reward)
+
+
+def flush() -> dict[str, float]:
+    """Write any buffered rollouts and return the running statistics."""
+    with _LOG_LOCK:
+        if _LOG_PATH and _BUFFER:
+            path = Path(_LOG_PATH)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write("\n".join(_BUFFER) + "\n")
+            _BUFFER.clear()
+        return _STATS.as_dict()
+
+
+if __name__ == "__main__":
+    # Self-check: run this on the training box before starting a real run.
+    #   python verl_reward.py <db_root> <db_id> "<gold sql>"
+    root, db_id, gold = sys.argv[1], sys.argv[2], sys.argv[3]
+    os.environ["TEXT2SQL_DB_ROOT"] = root
+    print("config:", _CONFIG.as_dict())
+    for label, completion in (
+        ("perfect", f"```sql\n{gold}\n```"),
+        ("degenerate SELECT 1", "```sql\nSELECT 1\n```"),
+        ("not sql", "I cannot answer that."),
+        ("write attempt", "```sql\nDROP TABLE x\n```"),
+    ):
+        score = compute_score("bird", completion, gold, {"db_id": db_id, "question_id": -1})
+        print(f"  {label:<22} reward={score}")
+    print("\nexpected: perfect > 0, everything else 0 under the default config")

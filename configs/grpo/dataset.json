@@ -1,0 +1,36 @@
+{
+ "train_parquet": "data\\processed\\rl\\train.parquet",
+ "val_parquet": "data\\processed\\rl\\val.parquet",
+ "source_train": "data\\processed\\train_filtered.json",
+ "source_train_sha256": "d6c2616aefb6236a80074c1f7b7bac13e2527e10a642f391b042306de8766ed5",
+ "source_val": "data\\processed\\val.json",
+ "prompt_config": {
+  "schema_style": "ddl",
+  "include_descriptions": false,
+  "include_evidence": true,
+  "sample_rows": 0,
+  "instruction_version": "v1"
+ },
+ "stats": {
+  "train": {
+   "n": 8191,
+   "n_databases": 66,
+   "prompt_chars_p50": 2783,
+   "prompt_chars_p99": 14110,
+   "prompt_chars_max": 14355,
+   "est_prompt_tokens_max": 3987
+  },
+  "val": {
+   "n": 200,
+   "n_databases": 3,
+   "prompt_chars_p50": 4192,
+   "prompt_chars_p99": 37502,
+   "prompt_chars_max": 37516,
+   "est_prompt_tokens_max": 10421
+  }
+ },
+ "suggested_max_prompt_length": 11264,
+ "git_sha": "ccf7157c51a76b49a08baae58ae53d89b57f976d",
+ "git_dirty": true,
+ "command": "scripts/build_rl_data.py"
+}

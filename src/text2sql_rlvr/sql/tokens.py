@@ -178,6 +178,16 @@ def leading_keyword(sql: str) -> str:
     return ""
 
 
+def has_from_clause(sql: str) -> bool:
+    """True if the statement reads from anything at all.
+
+    ``SELECT 1`` has no FROM. A policy that discovers a reward it can collect
+    without touching the database will produce exactly that shape, so it is
+    worth detecting explicitly rather than inferring later.
+    """
+    return any(word == "FROM" for word, _depth, _next_char in iter_code_words(sql))
+
+
 def has_top_level_order_by(sql: str) -> bool:
     """True if the statement has an ``ORDER BY`` that constrains its own output order.
 
