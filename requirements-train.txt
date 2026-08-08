@@ -14,14 +14,25 @@
 #   3. Only then: pip freeze > requirements-train.lock.txt, and record the verl
 #      commit sha and the lock date below.
 #
-# verl commit:  4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71
-# recorded on:  2026-08-08 (installed with `pip install -e .` from a fresh clone)
+# verl:         v0.8.0  (released 2026-06-01)
 # GPU:          single RTX 4090 24GB, AutoDL
 # CUDA / driver: <fill in>
 #
-# NOTE: the commit above is the one actually installed, not one chosen from a
-# release page. The rest of this file is still unpinned -- fill it in with
-# `pip freeze` once a GRPO run has completed end to end.
+# History, because it is the point of this file:
+#
+# 2026-08-08  Cloned verl at HEAD (4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71)
+#             because the runbook said `git clone`, not `git checkout <tag>`.
+#             Config validation passed and Ray started, then the run died on
+#             `ModuleNotFoundError: No module named 'transfer_queue'` -- HEAD
+#             carried a half-landed refactor whose task runner imports a data
+#             component that is not a dependency yet.
+#
+#             AGENTS.md has said "pin verl to a specific commit" since day one.
+#             The instruction was written and then not followed. Moving to a
+#             released tag.
+#
+# The rest of this file is still unpinned. Run `pip freeze > requirements-train.lock.txt`
+# once a GRPO run has completed end to end, and record the CUDA version here.
 
 torch
 vllm

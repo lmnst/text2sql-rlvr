@@ -69,17 +69,21 @@ llamafactory-cli export --model_name_or_path /root/autodl-tmp/Qwen3-1.7B --adapt
 **这一步不要跳。** 它把"我的奖励函数写错了"和"我的环境装坏了"这两种情况分开——
 这两者的报错长得一模一样。
 
+**装发布版本，不要装 HEAD。**
+
 ```bash
 git clone https://github.com/volcengine/verl /root/verl
-cd /root/verl && pip install -e .
+cd /root/verl && git checkout v0.8.0 && pip install -e .
 ```
 
-按 verl 官方 README 跑通它自带的 gsm8k GRPO 例子。跑通之后，
-**把 verl 的 commit 记下来填进 `requirements-train.txt`**：
+这一条是用一次失败换来的：第一次按 `git clone` 直接拿了 HEAD，
+配置校验全过、Ray 也起来了，然后死在
+`ModuleNotFoundError: No module named 'transfer_queue'`——
+HEAD 上有个没落地完的重构，其任务运行器 import 了一个还不是依赖的组件。
 
-```bash
-cd /root/verl && git rev-parse HEAD
-```
+AGENTS.md 从第一天就写着"verl 必须钉到具体版本"。规则写了，然后没照做。
+
+按 verl 官方 README 跑通它自带的 gsm8k GRPO 例子，再往下走。
 
 ## 第 3 步：传数据和奖励函数
 
