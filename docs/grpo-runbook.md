@@ -74,8 +74,15 @@ git clone https://github.com/volcengine/verl /root/verl
 cd /root/verl && git checkout 4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71 && pip install -e .
 ```
 
-这个 commit 上有个新加的数据组件 `transfer_queue`，任务运行器会 import 它，
-但它还不是依赖。**用命令行关掉即可**，见第 5 步。
+这个 commit 上的新版任务运行器（`TaskRunnerV1`）会无条件 import 一个叫
+`transfer_queue` 的新数据组件，而它还不是依赖。
+
+**解决办法是绕开整个运行器，不是关掉那个组件**：脚本里已经加了
+`trainer.use_v1=False`，verl 会改用旧版运行器（`main_ppo_v0`），后者不 import 它。
+
+这个区别值得留意：那个 import 在 `run()` 方法的第一行，
+早于任何配置生效，所以 `transfer_queue.enable=False` 之类的开关根本管不到它。
+**能被配置关掉的是功能，管不住的是 import。**
 
 ### 这一段是踩过两次坑之后写的
 
@@ -160,13 +167,8 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 ```
 
 ```bash
-/root/autodl-tmp/run_smoke.sh ++transfer_queue.enable=False
+/root/autodl-tmp/run_smoke.sh
 ```
-
-**两个加号。** Hydra 里 `+key=value` 表示"新增一个原本不存在的键"，
-而这个键已经存在，覆盖已有的键要用 `++`。写成一个加号会报
-`Could not append to config. An item is already at ...`，
-报错里其实已经给出了答案。
 
 这一步专门用来发现配置问题。verl 的配置在版本间会变，前几次报错是正常的，
 按下表自己处理，处理不了再贴出来。
@@ -177,6 +179,8 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 | `Could not override 'xxx'` | 这个键在当前版本**不存在** | 去 verl 的 `trainer/config/` 里找对应新名字 |
 | `CUDA out of memory` | 显存不够 | 依次降 `rollout.gpu_memory_utilization`、`rollout.n`、`data.train_batch_size` |
 | 卡在加载模型不动 | 通常在编译或初始化 vLLM | 等几分钟；超过十分钟再看日志 |
+| `Could not append to config. An item is already at 'X'` | 用了 `+X=` 但 X 已存在 | 改用 `++X=`（覆盖）或直接 `X=` |
+| `ModuleNotFoundError` 出现在 verl 自己的文件里 | verl 该版本的某条代码路径依赖了未安装的东西 | 找配置开关绕开**整条路径**；`import` 早于配置生效，关不掉 |
 
 **注意区分前两种。** 第一种说明键名是对的、只是没赋值，加上即可；
 第二种说明键名在这个版本里改掉了，得去源码里查。二者的处理方式完全不同。
