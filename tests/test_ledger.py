@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import subprocess
 
 import pytest
 
-from text2sql_rlvr.ledger import append_run, file_sha256, read_runs
+from text2sql_rlvr.ledger import append_run, file_sha256, git_state, read_runs
 
 MINIMAL = {
     "stage": "baseline",
@@ -69,19 +69,40 @@ class TestDirtinessIgnoresTheLedger:
     second run of any session reports a dirty tree and the warning stops meaning
     anything."""
 
-    def test_ledger_path_is_exempt(self, tmp_path):
-        from text2sql_rlvr.ledger import git_state
+    def test_a_lone_ledger_change_does_not_count_as_dirty(self, tmp_path):
+        """The real regression: parsing porcelain output by column offset shifted
+        every path by one character, so the exemption never matched anything."""
+        repo = tmp_path / "repo"
+        (repo / "results").mkdir(parents=True)
 
-        repo_ledger = Path("results/runs.jsonl")
-        sha, dirty = git_state(ignore_paths=(repo_ledger,))
-        assert isinstance(dirty, bool)
-        if sha:
-            # Whatever the tree state, asking to ignore the ledger must not make
-            # a clean tree look dirty.
-            _, dirty_without = git_state()
-            assert dirty <= dirty_without
+        def run(*args):
+            subprocess.run(args, cwd=repo, capture_output=True, check=True)
 
-    def test_unknown_provenance_counts_as_dirty(self, tmp_path, monkeypatch):
+        run("git", "init", "-q")
+        run("git", "config", "user.email", "t@example.com")
+        run("git", "config", "user.name", "t")
+        ledger = repo / "results" / "runs.jsonl"
+        ledger.write_text("{}\n", encoding="utf-8")
+        (repo / "code.py").write_text("x = 1\n", encoding="utf-8")
+        run("git", "add", "-A")
+        run("git", "commit", "-qm", "init")
+
+        sha, dirty = git_state(repo=repo, ignore_paths=(ledger,))
+        assert sha
+        assert dirty is False
+
+        ledger.write_text('{}\n{"a": 1}\n', encoding="utf-8")
+        _, dirty = git_state(repo=repo, ignore_paths=(ledger,))
+        assert dirty is False, "an appended ledger must not make the tree look dirty"
+
+        _, unexempted = git_state(repo=repo)
+        assert unexempted is True, "without the exemption it is genuinely dirty"
+
+        (repo / "code.py").write_text("x = 2\n", encoding="utf-8")
+        _, dirty = git_state(repo=repo, ignore_paths=(ledger,))
+        assert dirty is True, "a real source change must still be reported"
+
+    def test_unknown_provenance_counts_as_dirty(self, monkeypatch):
         import text2sql_rlvr.ledger as ledger_mod
 
         monkeypatch.setattr(ledger_mod, "_git", lambda *a, **k: "")

@@ -58,21 +58,23 @@ def git_state(
     if not sha:
         return "", True
 
-    status = _git("status", "--porcelain", cwd=repo)
-    if not status:
-        return sha, False
+    args = ["status", "--porcelain"]
+    root = _git("rev-parse", "--show-toplevel", cwd=repo) if ignore_paths else ""
+    if root:
+        # Let git do the excluding. Parsing porcelain output by column offset is
+        # brittle -- the status code is two columns wide and the first is often a
+        # space, which any stripping of the captured output silently eats.
+        excludes = []
+        for candidate in ignore_paths:
+            try:
+                relative = Path(candidate).resolve().relative_to(Path(root).resolve())
+            except ValueError:
+                continue
+            excludes.append(f":(exclude,top){relative.as_posix()}")
+        if excludes:
+            args += ["--", ":/", *excludes]
 
-    root = _git("rev-parse", "--show-toplevel", cwd=repo)
-    if not root or not ignore_paths:
-        return sha, True
-
-    root_path = Path(root)
-    ignored = {Path(p).resolve() for p in ignore_paths}
-    for line in status.splitlines():
-        changed = line[3:].strip().strip('"')
-        if (root_path / changed).resolve() not in ignored:
-            return sha, True
-    return sha, False
+    return sha, bool(_git(*args, cwd=repo))
 
 
 def file_sha256(path: str | Path | None) -> str:
