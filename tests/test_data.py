@@ -161,3 +161,40 @@ class TestPrompt:
         sql = extract_sql(completion)
         assert sql == "SELECT count(*) FROM staff"
         assert validate_read_only(sql).ok
+
+
+class TestInstructionVersions:
+    """v1 is kept so the first baseline stays reproducible; v2 is the default."""
+
+    def test_default_is_v2(self):
+        assert PromptConfig().instruction_version == "v2"
+
+    def test_v1_is_the_original_short_instruction(self, bird_root):
+        split = discover_split(bird_root, "mini_dev")
+        config = PromptConfig(instruction_version="v1")
+        prompt = build_user_prompt(split.load()[0], "schema", config)
+        assert "Do not use functions from other databases" not in prompt
+        assert "```sql" in prompt
+
+    def test_v2_states_the_dialect_and_the_pseudo_functions(self, bird_root):
+        split = discover_split(bird_root, "mini_dev")
+        config = PromptConfig(instruction_version="v2")
+        prompt = build_user_prompt(split.load()[0], "schema", config)
+        assert "YEAR()" in prompt
+        assert "DIVIDE(a, b)" in prompt
+        assert "exactly one statement" in prompt
+
+    def test_both_versions_still_ask_for_a_fenced_block(self, bird_root):
+        split = discover_split(bird_root, "mini_dev")
+        for version in ("v1", "v2"):
+            prompt = build_user_prompt(
+                split.load()[0], "schema", PromptConfig(instruction_version=version)
+            )
+            assert "```sql" in prompt, version
+
+    def test_unknown_version_raises(self):
+        with pytest.raises(ValueError, match="instruction_version"):
+            PromptConfig(instruction_version="v3")
+
+    def test_version_is_recorded_in_the_config_dict(self):
+        assert PromptConfig(instruction_version="v1").as_dict()["instruction_version"] == "v1"

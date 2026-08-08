@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import _bootstrap  # noqa: F401
@@ -25,6 +26,9 @@ _STAGES = ("baseline", "sft", "grpo", "ablation", "smoke")
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path("data/bird"))
+    parser.add_argument("--questions", type=Path, default=None,
+                        help="score a custom BIRD-format question file (e.g. the val "
+                             "split built by build_splits.py) using --split's databases")
     parser.add_argument("--split", choices=SPLITS, default="mini_dev")
     parser.add_argument("--predictions", type=Path, required=True)
     parser.add_argument("--stage", choices=_STAGES, required=True)
@@ -98,6 +102,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
     split = discover_split(args.root, args.split)
+    if args.questions:
+        split = replace(split, questions_path=args.questions)
+        print(f"questions overridden: {args.questions}")
     examples = split.load()
     predictions = load_predictions(args.predictions)
     meta = load_meta(args.predictions)

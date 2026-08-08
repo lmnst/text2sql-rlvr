@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 
 import _bootstrap  # noqa: F401
@@ -40,6 +41,9 @@ from text2sql_rlvr.sql import extract_sql
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, default=Path("data/bird"))
+    parser.add_argument("--questions", type=Path, default=None,
+                        help="score a custom BIRD-format question file (e.g. the val "
+                             "split built by build_splits.py) using --split's databases")
     parser.add_argument("--split", choices=SPLITS, default="mini_dev")
     parser.add_argument("--out", type=Path, required=True)
 
@@ -64,6 +68,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--descriptions", action="store_true", help="include column descriptions")
     parser.add_argument("--sample-rows", type=int, default=0)
     parser.add_argument("--no-evidence", action="store_true")
+    parser.add_argument("--instruction-version", choices=("v1", "v2"), default="v2",
+                        help="v1 reproduces the first baseline; v2 adds the dialect "
+                             "and pseudo-function rules")
 
     parser.add_argument("--limit", type=int, default=0, help="first N examples, 0 for all")
     parser.add_argument("--resume", action="store_true", help="skip ids already in --out")
@@ -88,9 +95,13 @@ def main(argv: list[str] | None = None) -> int:
         include_descriptions=args.descriptions,
         include_evidence=not args.no_evidence,
         sample_rows=args.sample_rows,
+        instruction_version=args.instruction_version,
     )
 
     split = discover_split(args.root, args.split)
+    if args.questions:
+        split = replace(split, questions_path=args.questions)
+        print(f"questions overridden: {args.questions}")
     examples = split.load()
     if args.limit:
         examples = examples[: args.limit]

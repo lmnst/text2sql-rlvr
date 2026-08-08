@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from text2sql_rlvr.ledger import append_run, file_sha256, read_runs
@@ -60,3 +62,27 @@ def test_config_hash_is_recorded(tmp_path):
 def test_absent_config_hashes_to_empty(tmp_path):
     entry = append_run({**MINIMAL, "config_path": "nope.yaml"}, path=tmp_path / "runs.jsonl")
     assert entry["config_sha256"] == ""
+
+
+class TestDirtinessIgnoresTheLedger:
+    """The ledger is tracked and every run appends to it. Without an exemption the
+    second run of any session reports a dirty tree and the warning stops meaning
+    anything."""
+
+    def test_ledger_path_is_exempt(self, tmp_path):
+        from text2sql_rlvr.ledger import git_state
+
+        repo_ledger = Path("results/runs.jsonl")
+        sha, dirty = git_state(ignore_paths=(repo_ledger,))
+        assert isinstance(dirty, bool)
+        if sha:
+            # Whatever the tree state, asking to ignore the ledger must not make
+            # a clean tree look dirty.
+            _, dirty_without = git_state()
+            assert dirty <= dirty_without
+
+    def test_unknown_provenance_counts_as_dirty(self, tmp_path, monkeypatch):
+        import text2sql_rlvr.ledger as ledger_mod
+
+        monkeypatch.setattr(ledger_mod, "_git", lambda *a, **k: "")
+        assert ledger_mod.git_state() == ("", True)

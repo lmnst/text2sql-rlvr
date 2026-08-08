@@ -42,16 +42,37 @@ def _git(*args: str, cwd: Path | None = None) -> str:
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
-def git_state(repo: Path | None = None) -> tuple[str, bool]:
+def git_state(
+    repo: Path | None = None, ignore_paths: tuple[str | Path, ...] = ()
+) -> tuple[str, bool]:
     """Return ``(sha, dirty)``. ``("", True)`` when git is unavailable.
 
     Unknown provenance is treated as dirty on purpose: a run we cannot pin to a
     commit must not be reportable.
+
+    ``ignore_paths`` exists for the ledger itself. It is tracked and every run
+    appends to it, so without this the second run of any session would report a
+    dirty tree and the warning would stop meaning anything.
     """
     sha = _git("rev-parse", "HEAD", cwd=repo)
     if not sha:
         return "", True
-    return sha, bool(_git("status", "--porcelain", cwd=repo))
+
+    status = _git("status", "--porcelain", cwd=repo)
+    if not status:
+        return sha, False
+
+    root = _git("rev-parse", "--show-toplevel", cwd=repo)
+    if not root or not ignore_paths:
+        return sha, True
+
+    root_path = Path(root)
+    ignored = {Path(p).resolve() for p in ignore_paths}
+    for line in status.splitlines():
+        changed = line[3:].strip().strip('"')
+        if (root_path / changed).resolve() not in ignored:
+            return sha, True
+    return sha, False
 
 
 def file_sha256(path: str | Path | None) -> str:
@@ -77,7 +98,7 @@ def append_run(record: dict[str, Any], path: str | Path = DEFAULT_LEDGER) -> dic
     if record["stage"] not in _STAGES:
         raise ValueError(f"stage must be one of {_STAGES}, got {record['stage']!r}")
 
-    sha, dirty = git_state()
+    sha, dirty = git_state(ignore_paths=(path,))
     entry: dict[str, Any] = {
         "run_id": uuid.uuid4().hex[:12],
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
