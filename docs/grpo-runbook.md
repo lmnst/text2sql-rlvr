@@ -181,6 +181,13 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 | 卡在加载模型不动 | 通常在编译或初始化 vLLM | 等几分钟；超过十分钟再看日志 |
 | `Could not append to config. An item is already at 'X'` | 用了 `+X=` 但 X 已存在 | 改用 `++X=`（覆盖）或直接 `X=` |
 | `ModuleNotFoundError` 出现在 verl 自己的文件里 | verl 该版本的某条代码路径依赖了未安装的东西 | 找配置开关绕开**整条路径**；`import` 早于配置生效，关不掉 |
+| `FlashAttention2 has been toggled on, but ... doesn't seem to be installed` | 模型的 `config.json` 里指定了 FA2 | 把 `config.json` 里的 `attn_implementation` 改成 `sdpa`，或加 `actor_rollout_ref.model.override_config.attn_implementation=sdpa` |
+
+**不要为此去装 flash-attn。** 它编译常需半小时，且对 torch / CUDA 版本敏感，
+很容易触发又一轮依赖连锁反应。`sdpa` 是 PyTorch 自带实现，
+1.7B 这个规模用它只是稍慢，精度没有差别。
+
+这一条与前面 numpy 那次是同一个原则：**能用配置解决的，不要动依赖。**
 
 **注意区分前两种。** 第一种说明键名是对的、只是没赋值，加上即可；
 第二种说明键名在这个版本里改掉了，得去源码里查。二者的处理方式完全不同。
