@@ -90,8 +90,24 @@ scp -P 端口号 -r data/processed/rl root@你的地址:/root/autodl-tmp/
 ```
 
 ```bash
-scp -P 端口号 scripts/verl_reward.py configs/grpo/run_grpo.sh configs/grpo/run_smoke.sh root@你的地址:/root/autodl-tmp/
+scp -P 端口号 scripts/verl_reward.py scripts/analyze_rollouts.py configs/grpo/run_grpo.sh configs/grpo/run_smoke.sh root@你的地址:/root/autodl-tmp/
 ```
+
+**还要把 `src/` 传上去。** 奖励函数不是一个独立文件，它 import 了整个包
+（执行沙箱、结果比较、SQL 解析）：
+
+```bash
+scp -P 端口号 -r src root@你的地址:/root/autodl-tmp/
+```
+
+传完在云上确认：
+
+```bash
+ls /root/autodl-tmp/src/text2sql_rlvr/
+```
+
+脚本会自己在几个位置找这个包（同级 `src/`、上一层 `src/`、以及同目录），
+都找不到时会打印它找过哪些路径。也可以用 `TEXT2SQL_SRC` 指定。
 
 奖励函数要执行 SQL，所以**这次数据库必须传**（train_databases，约 30 GB）。
 如果嫌大，也可以在云上直接下载 BIRD 训练集，比从德国上传快得多。

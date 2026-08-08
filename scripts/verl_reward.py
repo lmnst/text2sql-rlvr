@@ -30,7 +30,36 @@ import sys
 import threading
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+def _locate_package() -> Path:
+    """Find `text2sql_rlvr` whether this file sits in the repo or was copied out.
+
+    verl is pointed at this file by absolute path, so it commonly ends up on its
+    own in a working directory with no repo around it. Guessing one layout and
+    failing with a bare ImportError wastes a GPU-hour of confusion.
+    """
+    candidates = []
+    override = os.environ.get("TEXT2SQL_SRC")
+    if override:
+        candidates.append(Path(override))
+    here = Path(__file__).resolve()
+    candidates += [
+        here.parents[1] / "src",  # in the repo: <repo>/scripts/verl_reward.py
+        here.parent / "src",  # copied next to a src/ directory
+        here.parent,  # copied next to the package itself
+    ]
+    for candidate in candidates:
+        if (candidate / "text2sql_rlvr" / "__init__.py").is_file():
+            return candidate
+    tried = "\n  ".join(str(c) for c in candidates)
+    raise ModuleNotFoundError(
+        "cannot find the text2sql_rlvr package. Copy the repo's src/ directory to "
+        "the training box, or set TEXT2SQL_SRC to wherever it lives.\nLooked in:\n  "
+        + tried
+    )
+
+
+sys.path.insert(0, str(_locate_package()))
 
 from text2sql_rlvr.rewards.reward import (  # noqa: E402
     RewardConfig,
@@ -131,7 +160,12 @@ def flush() -> dict[str, float]:
 
 if __name__ == "__main__":
     # Self-check: run this on the training box before starting a real run.
-    #   python verl_reward.py <db_root> <db_id> "<gold sql>"
+    if len(sys.argv) != 4:
+        print('usage: python verl_reward.py <db_root> <db_id> "<gold sql>"')
+        print("example:")
+        print("  python verl_reward.py /root/autodl-tmp/bird/train/train_databases \\")
+        print('      california_schools "SELECT COUNT(*) FROM schools"')
+        sys.exit(2)
     root, db_id, gold = sys.argv[1], sys.argv[2], sys.argv[3]
     os.environ["TEXT2SQL_DB_ROOT"] = root
     print("config:", _CONFIG.as_dict())

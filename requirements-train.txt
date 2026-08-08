@@ -14,10 +14,14 @@
 #   3. Only then: pip freeze > requirements-train.lock.txt, and record the verl
 #      commit sha and the lock date below.
 #
-# verl commit:  <fill in>
-# locked on:    <fill in>
+# verl commit:  4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71
+# recorded on:  2026-08-08 (installed with `pip install -e .` from a fresh clone)
+# GPU:          single RTX 4090 24GB, AutoDL
 # CUDA / driver: <fill in>
-# GPU:          <fill in>
+#
+# NOTE: the commit above is the one actually installed, not one chosen from a
+# release page. The rest of this file is still unpinned -- fill it in with
+# `pip freeze` once a GRPO run has completed end to end.
 
 torch
 vllm
