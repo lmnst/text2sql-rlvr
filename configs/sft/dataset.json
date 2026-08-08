@@ -1,0 +1,30 @@
+{
+ "source_questions": "data\\processed\\train_filtered.json",
+ "source_questions_sha256": "d6c2616aefb6236a80074c1f7b7bac13e2527e10a642f391b042306de8766ed5",
+ "output": "data\\processed\\sft_train.jsonl",
+ "n_examples": 8191,
+ "n_databases": 66,
+ "prompt_config": {
+  "schema_style": "ddl",
+  "include_descriptions": false,
+  "include_evidence": true,
+  "sample_rows": 0,
+  "instruction_version": "v1"
+ },
+ "length_stats": {
+  "n": 8191,
+  "chars_p50": 2954,
+  "chars_p95": 10820,
+  "chars_p99": 14296,
+  "chars_max": 14599,
+  "longest_db_id": "mondial_geo",
+  "est_tokens_p99": 4332,
+  "est_tokens_max": 4423,
+  "chars_per_token_assumed": 3.3
+ },
+ "cutoff_tokens_checked": 4096,
+ "n_over_budget": 293,
+ "git_sha": "87c7c0c3d19ae933c11aaf47b900678c2b656bee",
+ "git_dirty": true,
+ "command": "scripts/build_sft_data.py"
+}

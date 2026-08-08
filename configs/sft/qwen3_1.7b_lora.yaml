@@ -1,0 +1,62 @@
+# LoRA SFT for Qwen3-1.7B on BIRD, for LLaMA-Factory.
+#
+# STATUS: not yet run. Every value below is a considered starting point, not a
+# measured one. Verify the two flagged items before trusting a full run.
+
+### model
+model_name_or_path: /root/autodl-tmp/Qwen3-1.7B
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+lora_target: all
+
+### dataset
+dataset: text2sql_sft
+dataset_dir: /root/autodl-tmp/sft_data
+# VERIFY: the template must produce the same string vLLM produces at inference.
+# If this build of LLaMA-Factory has no `qwen3`, use `qwen`.
+template: qwen3
+# VERIFY: Qwen3 templates can wrap the answer in a <think> block. Training with
+# it while serving without it (or the reverse) trains a format the evaluator
+# never sees. AGENTS.md says thinking stays off.
+enable_thinking: false
+# 6144 is the measured point at which nothing truncates; 8192 leaves margin for
+# the tokenizer disagreeing with the character-based estimate. Truncation cuts
+# the end of the sequence, which is the answer.
+cutoff_len: 8192
+overwrite_cache: true
+preprocessing_num_workers: 8
+
+### output
+output_dir: /root/autodl-tmp/out/qwen3-1.7b-sft-lora
+logging_steps: 10
+save_steps: 500
+plot_loss: true
+overwrite_output_dir: true
+report_to: none
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 1.0e-4
+# One epoch first. Evaluate, then decide whether a second is worth the money --
+# rather than paying for two and discovering the first was enough.
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+bf16: true
+gradient_checkpointing: true
+
+### held-out loss during training
+# A small slice of the training file, only to watch the loss curve. Model
+# selection uses data/processed/val.json, whose databases the model never sees.
+val_size: 0.01
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 200
