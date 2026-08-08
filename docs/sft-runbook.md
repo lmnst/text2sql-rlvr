@@ -126,21 +126,32 @@ llamafactory-cli train /root/autodl-tmp/qwen3_1.7b_lora_smoke.yaml
 
 ## 第 5 步：验证对话模板是否一致（最关键的一步）
 
-这一步是防上面说的那个唯一风险。在云上：
+这一步是防上面说的那个唯一风险。把脚本传上去（本地）：
 
 ```bash
-python -c "
-from transformers import AutoTokenizer
-import json
-tok = AutoTokenizer.from_pretrained('/root/autodl-tmp/Qwen3-1.7B')
-r = json.loads(open('/root/autodl-tmp/sft_data/sft_train.jsonl').readline())
-s = tok.apply_chat_template(r['messages'][:2], tokenize=False, add_generation_prompt=True, enable_thinking=False)
-print(repr(s[-300:]))
-"
+scp -P 端口号 scripts/check_chat_template.py root@你的地址:/root/autodl-tmp/
 ```
 
-看最后 300 个字符。**关键是结尾不能有 `<think>`**。如果有，说明推理时模型会被要求先思考，
-而训练数据里没有思考过程，两边对不上。出现这种情况把输出贴给我。
+在云上跑：
+
+```bash
+python /root/autodl-tmp/check_chat_template.py --model /root/autodl-tmp/Qwen3-1.7B --data /root/autodl-tmp/sft_data/sft_train.jsonl
+```
+
+**要看的不是"有没有 `<think>`"。** Qwen3 的非思考格式本来就包含一对空的
+`<think></think>`，看到它是正常的。
+
+要看的是最后一行是 `PASS` 还是 `FAIL`。判据是：
+**推理时交给模型的那串字符，是否恰好是训练序列的前缀。**
+
+- 是前缀 → 模型被训练成"从生成起点继续往下写"，两边严丝合缝，没问题。
+- 不是前缀 → 推理时给模型的开头是它训练时从没见过的，学到的东西用不上。
+
+`FAIL` 就停下，别开正式训练，把输出贴出来。
+
+这个脚本只验证了分词器自带的模板（也就是 vLLM 推理时用的那套）。
+**训练框架实际用的是不是同一套，还要看第 4 步冒烟训练打印出来的那个样例**——
+LLaMA-Factory 会在开始训练前打印第一条样本的原文，对照着看 assistant 段长什么样。
 
 ## 第 6 步：正式训练
 
