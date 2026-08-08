@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# GRPO on one 24 GB GPU, starting from the merged SFT model.
+# GRPO on one GPU, starting from the merged SFT model.
 #
-# STATUS: never run. Every number below is a considered starting point.
-# Run configs/grpo/run_smoke.sh first -- it is this file with the step count
-# turned down, and it is the only cheap way to find out which of these keys
-# your verl build actually accepts.
+# STATUS: initialization reached the first actor-to-vLLM weight sync on the
+# pinned verl commit, but no training step has completed. Run run_smoke.sh
+# first. The AutoDL compatibility overrides below are observed fixes, while
+# the training hyperparameters remain starting points rather than validated
+# settings.
 set -euo pipefail
 
 MODEL=${MODEL:-/root/autodl-tmp/Qwen3-1.7B-sft-merged}
@@ -37,6 +38,8 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.model.lora_rank=32 \
   actor_rollout_ref.model.lora_alpha=64 \
   actor_rollout_ref.model.target_modules=all-linear \
+  ++actor_rollout_ref.model.lora.merge=True \
+  +actor_rollout_ref.model.override_config.attn_implementation=sdpa \
   actor_rollout_ref.model.enable_gradient_checkpointing=True \
   actor_rollout_ref.actor.optim.lr=1e-6 \
   actor_rollout_ref.actor.ppo_mini_batch_size=32 \
@@ -50,6 +53,8 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
   actor_rollout_ref.rollout.max_model_len=8704 \
   actor_rollout_ref.rollout.load_format=safetensors \
+  ++actor_rollout_ref.rollout.enable_sleep_mode=False \
+  ++actor_rollout_ref.rollout.free_cache_engine=False \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
   custom_reward_function.path=/root/autodl-tmp/verl_reward.py \

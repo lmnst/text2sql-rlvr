@@ -20,45 +20,57 @@
 - GRPO smoke test 尚未跑通，因此没有 GRPO 结果，也没有 reward-hacking
   对照实验结果。不要把配置或计划写成已经验证。
 
-当前唯一主线是先跑通 AutoDL 上的 GRPO smoke，再决定正式训练。
+当前唯一主线是迁移到单卡 48 GB 实例，先跑通 GRPO smoke，再决定正式训练。
 
 ## 当前卡点
 
-最近一次 AutoDL 调试停在 vLLM 报错：
+最近一次在单卡 RTX 4090 24 GB 上的调试已经依次越过配置解析、Ray 初始化、
+vLLM 初始化，并走到第一次把 actor 权重同步给 vLLM。已确认三处兼容问题：
+
+- `trainer.use_v1=False`：绕开会导入缺失 `transfer_queue` 的新版任务运行器。
+- 模型要求 FlashAttention2、环境未安装：覆盖为 PyTorch `sdpa`。
+- AutoDL 容器不支持 vLLM 睡眠模式需要的 cuMem 接口：必须同时设置
+  `rollout.enable_sleep_mode=False` 和 `rollout.free_cache_engine=False`。
+
+只关 `free_cache_engine` 不够：它只控制后续是否调用 sleep；
+`enable_sleep_mode` 会直接传给 vLLM，并在初始化时触发 cuMem 检查。
+
+关闭睡眠模式后，当前 vLLM/verl 组合又在 LoRA IPC 注入时触发
+`IndexError: tuple index out of range`。设置 `model.lora.merge=True` 后确认切换到了
+“先把 LoRA 合入权重、再走普通权重同步”的路径，绕过了 `add_lora()`。
+
+4090 上最后的真实失败是第一次完整权重同步时 OOM，而非显存碎片：actor/FSDP
+约占 13.21 GiB，vLLM 约占 10.20 GiB，整卡只剩 93 MiB，随后复制
+`lm_head.weight` 还需约 1.16 GiB。**尚未产生 rollout、reward、训练 step 或 checkpoint。**
+
+因此当前决定是换一张 48 GB 卡，不先做双卡。原因是双卡会同时引入 FSDP、张量并行和
+NCCL 的新变量；48 GB 单卡更适合先证明链路成立。A40 更省钱，L40/L40S/RTX 6000 Ada
+更快；这只是选型建议，不是已经租用或跑通的结果。
+
+当前 AutoDL 旧实例已关机、未释放。关机前已运行 `sync`，并生成：
 
 ```text
-cumem allocator is not supported on current platform
+/root/autodl-tmp/handoff_20260809.tar.gz
 ```
 
-容器不支持 vLLM 睡眠模式需要的 CUDA 虚拟内存接口。下一次 smoke 应在现有命令上增加：
-
-```bash
-actor_rollout_ref.rollout.free_cache_engine=False
-```
-
-如果显存不足，再把 `actor_rollout_ref.rollout.gpu_memory_utilization` 从 `0.4`
-降到 `0.3`。不要先改依赖或安装 flash-attn。
-
-已确认的另外两项环境处理：
-
-- `trainer.use_v1=False`：绕过会导入缺失 `transfer_queue` 的新版任务运行器；
-  该项已经写入 `configs/grpo/run_grpo.sh`。
-- FlashAttention2 缺失时改用 `sdpa`；具体覆盖方式见
-  `docs/grpo-runbook.md`。
-
-每次训练进程崩溃后，先清掉残留 Ray/vLLM 进程并用 `nvidia-smi` 确认显存归零，
-再重试。命令在 `docs/grpo-runbook.md`。
+截图确认合并后的 SFT 模型约 3.3 GB、RL 数据目录约 3.3 MB；
+`/root/autodl-tmp/bird` 当时不存在，所以迁移后必须重新定位或下载 BIRD train 数据库。
+没有有效的 GRPO checkpoint 需要抢救。
 
 ## 下一步
 
-1. 在 AutoDL 恢复此前可运行的 verl HEAD 环境，不升级或降级依赖。
-2. 清理残留进程。
-3. 按 `docs/grpo-runbook.md` 重新运行三步 smoke，并增加
-   `actor_rollout_ref.rollout.free_cache_engine=False`。
-4. 确认 trainer 启动、至少完成一个训练 step，并产生
+1. 在 AutoDL 同一区域用“克隆实例”迁移旧实例到单卡 48 GB，并勾选复制数据盘；
+   旧实例先保留，等新实例验收后再释放。
+2. 在新实例确认模型、RL 数据、交接压缩包和 verl commit
+   `4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71`，不要升级或降级依赖。
+3. 找回或重新下载 BIRD train 数据库，确认
+   `$TEXT2SQL_DB_ROOT` 指向真实的 `train_databases`。
+4. 从最新 Git 仓库复制 `configs/grpo/run_grpo.sh`、`run_smoke.sh`、奖励脚本和 `src/`
+   到 `/root/autodl-tmp/`，再按 `docs/grpo-runbook.md` 运行奖励自检和三步 smoke。
+5. 确认至少完成一个训练 step，并产生
    `rollouts.jsonl`；失败时保存完整报错和实际 verl commit。
-5. smoke 通过后先提交环境配置与证据，再运行严格奖励版本。
-6. 严格版本稳定后，才运行 `TEXT2SQL_REWARD_EXEC=0.3` 的朴素奖励对照。
+6. smoke 通过后先提交环境配置与证据，再运行严格奖励版本；严格版本稳定后，
+   才运行 `TEXT2SQL_REWARD_EXEC=0.3` 的朴素奖励对照。
 
 ## 换电脑后恢复
 

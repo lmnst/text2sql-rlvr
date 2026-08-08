@@ -672,3 +672,52 @@ schema 文本里全是重复的长标识符，分词效率比自然语言高得�
 - **反作弊实验尚未进行。** 目前只有"漏洞存在且可测量"的工具，
   没有"模型确实会去利用它"的证据。这是下一个里程碑要拿到的东西。
 - 模型在拿到满分的题里有多少是"SQL 写错但结果碰巧对"，**从里程碑 3 记到现在仍未抽查**。
+
+---
+
+## 2026-08-09 · 里程碑 11：GRPO 初始化走到权重同步，24 GB 单卡容量不足
+
+### 做了什么
+
+在 AutoDL 单卡 RTX 4090 24 GB 上实际调试了 GRPO smoke。使用的 verl commit 是
+`4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71`。这次已经越过配置解析、Ray worker
+初始化和 vLLM 初始化，最终走到第一次把训练侧 actor 权重同步给 vLLM。
+
+沿途确认并处理了三类兼容问题：旧版任务运行器绕过缺失的 `transfer_queue`；
+没有 FlashAttention2 时改用 PyTorch `sdpa`；AutoDL 容器不支持 vLLM 睡眠模式所需的
+cuMem 接口时，同时关闭 `enable_sleep_mode` 和 `free_cache_engine`。
+
+关闭睡眠模式后，LoRA 的 IPC 注入路径在 vLLM `add_lora()` 内因张量维度不匹配失败。
+设置 `lora.merge=True` 后，日志确认程序改走“先把 LoRA 合入基础权重，再同步普通权重”的路径。
+
+最后一次真实失败发生在这条合并路径的首次权重同步：actor/FSDP 进程约占 13.21 GiB，
+vLLM 进程约占 10.20 GiB，24 GB 卡只剩 93 MiB；复制 `lm_head.weight` 还需约 1.16 GiB，
+因此 OOM。reserved-but-unallocated 只有约 108 MiB，这不是显存碎片造成的假象。
+
+关机前生成了 `/root/autodl-tmp/handoff_20260809.tar.gz` 并执行 `sync`。
+截图确认合并后的 SFT 模型约 3.3 GB、RL 数据约 3.3 MB；但
+`/root/autodl-tmp/bird` 不存在。旧实例目前已关机但未释放。
+
+### 为什么这么设计
+
+cuMem 问题需要同时关两个开关，因为它们控制不同阶段：`enable_sleep_mode` 决定 vLLM
+初始化时是否启用该能力，`free_cache_engine` 只控制后续是否调用释放。此前只建议关闭
+`free_cache_engine` 是错误的，已经在运行手册和脚本中订正。
+
+下一步优先换单卡 48 GB，而不是立即双卡。双卡会额外引入 FSDP 分片、张量并行和 NCCL
+通信等变量；现在的目标只是先证明单机链路可以完成训练 step，单张大显存卡更容易隔离问题。
+
+smoke 脚本收缩到 batch 2、每题 2 个 rollout，并计划使用 CPU offload、eager 模式和
+`max_num_seqs=4`。这不是为了正式训练效果，而是降低第一次端到端验证的显存和并发压力；
+smoke 通过后再逐项恢复吞吐配置。
+
+### 还没验证的
+
+- **仍未完成任何 GRPO 训练 step。** 没有 rollout、reward、反向传播或 GRPO checkpoint。
+- `lora.merge=True` 只确认切换了代码路径，没有在足够显存的卡上完成权重同步。
+- 单卡 48 GB 是否足够、保守 smoke 参数是否能跑通，尚未验证。
+- CPU offload、eager 模式和 `max_num_seqs=4` 的吞吐代价尚未测量。
+- 尚未创建或克隆 48 GB 新实例；当前只有迁移计划。
+- BIRD train 数据库没有出现在关机前检查的预期路径，迁移后必须重新定位或下载，
+  否则奖励函数无法执行 SQL。
+- 正式 GRPO 超参数和预计耗时都没有新证据，不能引用为结果。

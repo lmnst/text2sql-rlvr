@@ -39,6 +39,28 @@ SFT 之后有 25 道题，官方口径给分而严格口径不给。全部是同
 
 ---
 
+## 2026-08-09 实际调试断点
+
+在 AutoDL 单卡 RTX 4090 24 GB、verl commit
+`4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71` 上，初始化已经走到第一次
+actor-to-vLLM 权重同步，但**没有完成任何训练 step**。
+
+已从源码和实际调用路径确认：
+
+- `rollout.enable_sleep_mode` 传给 vLLM，决定初始化时是否启用 cuMem 睡眠能力；
+- `rollout.free_cache_engine` 决定训练过程中是否调用 sleep/release；
+- AutoDL 当前容器不支持 cuMem，所以两项必须同时为 `False`，只关后一项无效；
+- 当前 verl/vLLM 组合的 LoRA IPC 注入会在 `add_lora()` 中报张量维度错误；
+  `model.lora.merge=True` 已确认能切换到先合并 LoRA、再同步普通权重的路径。
+
+这条合并路径在 24 GB 卡上首次同步权重时真实 OOM：actor/FSDP 约占 13.21 GiB，
+vLLM 约占 10.20 GiB，只剩 93 MiB，而复制 `lm_head.weight` 还需要约 1.16 GiB。
+reserved-but-unallocated 只有约 108 MiB，因此这次不是碎片问题。
+
+下一次计划在单卡 48 GB 上运行 `run_smoke.sh`。脚本已把 smoke 收缩到
+batch 2、每题 2 个 rollout，并启用 CPU offload、eager 模式和 `max_num_seqs=4`；
+这些参数是待验证的保守起点，不是已跑通配置。
+
 ## 第 0 步：本地已经做完
 
 ```
@@ -177,12 +199,14 @@ chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
 |---|---|---|
 | `Please set at least one of 'X' or 'X_per_gpu'` | 这个键存在但默认为空，必须显式设 | 在脚本里加 `X_per_gpu=1` |
 | `Could not override 'xxx'` | 这个键在当前版本**不存在** | 去 verl 的 `trainer/config/` 里找对应新名字 |
-| `CUDA out of memory` | 显存不够 | 依次降 `rollout.gpu_memory_utilization`、`rollout.n`、`data.train_batch_size` |
+| `CUDA out of memory` | 显存不够 | 先看各进程占用和 requested bytes；再降 `rollout.n`、batch，启用 CPU offload，或换更大显存卡 |
 | 卡在加载模型不动 | 通常在编译或初始化 vLLM | 等几分钟；超过十分钟再看日志 |
 | `Could not append to config. An item is already at 'X'` | 用了 `+X=` 但 X 已存在 | 改用 `++X=`（覆盖）或直接 `X=` |
 | `ModuleNotFoundError` 出现在 verl 自己的文件里 | verl 该版本的某条代码路径依赖了未安装的东西 | 找配置开关绕开**整条路径**；`import` 早于配置生效，关不掉 |
 | `FlashAttention2 has been toggled on, but ... doesn't seem to be installed` | 模型的 `config.json` 里指定了 FA2 | 把 `config.json` 里的 `attn_implementation` 改成 `sdpa`，或加 `+actor_rollout_ref.model.override_config.attn_implementation=sdpa` |
-| `cumem allocator is not supported on current platform` | vLLM 的睡眠模式需要 CUDA 虚拟内存接口，容器环境不支持 | 加 `actor_rollout_ref.rollout.free_cache_engine=False`；代价是训练时 vLLM 不释放显存，可能要把 `gpu_memory_utilization` 降到 0.3 |
+| `cumem allocator is not supported on current platform` | vLLM 的睡眠模式需要 CUDA 虚拟内存接口，容器环境不支持 | **同时**加 `++actor_rollout_ref.rollout.enable_sleep_mode=False` 和 `++actor_rollout_ref.rollout.free_cache_engine=False`；只关后者无效 |
+| `column_parallel_linear.set_lora` 中 `IndexError: tuple index out of range` | 当前 verl/vLLM 组合的 LoRA IPC 权重形状不兼容 | 加 `++actor_rollout_ref.model.lora.merge=True`，先合并 LoRA 再同步普通权重；会增加同步时峰值显存 |
+| `_merged_lora_per_tensor_param` 复制 `lm_head.weight` 时 OOM | 合并后的完整权重同步峰值超过当前卡容量 | 24 GB 上已真实发生；下一步改用单卡 48 GB 并先跑保守 smoke，不把它误判成 cuMem 或碎片问题 |
 
 ### 每次崩溃之后，先清理再重试
 
@@ -294,6 +318,7 @@ python scripts/analyze_rollouts.py --rollouts /path/to/rollouts.jsonl
 | 奖励函数本身 | **30+ 条单元测试，本地全绿** |
 | 训练数据格式 | 本地生成并读回验证 |
 | `max_prompt_length=8192` | **实测**：1288 次真实生成中最长 6731 token |
-| verl 配置项名称 | **从未验证**，最可能卡在这里 |
-| 显存能否放下 | 未验证，放不下就调低 `gpu_memory_utilization` 和 `rollout.n` |
+| verl 配置与初始化 | 在锁定 commit 上已走到首次权重同步；不是完整训练验证 |
+| 单卡 24 GB 显存 | 当前“关闭睡眠 + 合并 LoRA 同步”路径在首次权重同步时已确认 OOM |
+| 单卡 48 GB 显存 | **未验证**；下一次 smoke 的目标环境 |
 | 超参数 | 有依据的起点，非实测最优 |

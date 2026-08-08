@@ -15,9 +15,10 @@ and recorded. The tracked experiment ledger currently reports:
 - Qwen3-1.7B baseline on BIRD Mini-Dev (500 examples): 19.80% official EX, 17.40% strict EX.
 - One-epoch LoRA SFT: 34.60% official EX, 30.00% strict EX.
 
-The current gate is the first GRPO smoke test on AutoDL. It has not completed, so there are no
-GRPO or reward-hacking results. The recent commits document environment failures and candidate
-configuration fixes, not a successful training run.
+The current gate is the first GRPO smoke test on AutoDL. Initialization reached the first
+actor-to-vLLM weight sync on one RTX 4090 24 GB, where the no-sleep, merged-LoRA path ran out of
+memory. It has not completed a training step, so there are no GRPO or reward-hacking results.
+The next planned attempt is a conservative smoke test on one 48 GB GPU; this is not yet verified.
 
 Start with [HANDOFF.md](HANDOFF.md) for the exact continuation point and
 [docs/PROGRESS.md](docs/PROGRESS.md) for the evidence-backed milestone history. Project rules and
