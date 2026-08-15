@@ -779,3 +779,57 @@ GRPO 尚未训练，本轮是在上 GPU 前对本地仓库做的一次「可投�
 恢复为原始值（train 0–9427、val 1359–7013），且用 `seed=0` 重新切分后 train/val 的
 题目集合与之前完全一致（切分是可复现的）；8 个数据库的 prompt 与评测逻辑逐字节一致。
 顺带把 manifest 里过时的 `chars_per_token_assumed`（3.3）修正为代码里已实装的 3.6。
+
+---
+
+## 2026-08-16 · 里程碑 13：GRPO 三步 smoke 跑通（从 24GB OOM 到 Blackwell 全链路打通）
+
+### 做了什么
+
+把上一次卡死在「24GB 显存 OOM、一步训练都没跑成」的 GRPO，推进到**三步 smoke 完整跑完**。
+在 AutoDL 一张 RTX 6000D 84GB（Blackwell 新架构）上，3 个训练 step 全部执行：rollout 生成 →
+奖励计算 → 旧 log 概率 → advantage → 反向传播 → 权重更新，每个 step 约 14 秒。
+产出 `rollouts.jsonl` 212 行，每行是一条 rollout 的完整打分记录。
+
+这次 smoke 用的是**未经任何训练的 Qwen3-1.7B**（数据盘丢失后 SFT adapter 没了），所以它验证的是
+「GRPO 训练链路本身通不通」，而不是「训练有没有效果」。
+
+### 为什么这么设计 / 踩了什么坑
+
+从 24GB 换到 84GB Blackwell，引入的不是一张卡，而是一整套「三新叠加」的版本矩阵：新硬件
+（Blackwell sm_120）+ 新框架（verl 0.9 配置大改版）+ 新 vLLM（0.26 起 LoRA 模块重构）。
+沿途踩平了十几处坑，每一处都有明确的根因，不是瞎试：
+
+- **torch 2.11.0 在 Blackwell 上的 import bug**（PyTorch #186220）：`torch._inductor` 把
+  flex_attention 模板和 grouped_mm 外部核各注册两次。解法是注释掉 `select_algorithm.py` 里
+  两行 assert——安全，因为我们用 sdpa + eager，根本不开 torch.compile。
+- **vLLM 版本矩阵**：0.26/0.25 的 LoRA 模块（`lora_model`）和 verl 4a2cba7 期望的旧 API
+  对不上，最终钉在 vLLM 0.24.0；transformers 5.6.0 被 verl 明确排除，降到 5.5.3。
+- **flash-attn 无法源码编译**（系统 nvcc 是 CUDA 12.8，torch 是 cu130），但 verl 只需要它
+  的纯 Python `bert_padding` 工具函数，改 verl 一行 import 换成 transformers + einops 即可，
+  不用装那个编译重得要死的 CUDA kernel。
+- **verl 0.9 自己的 bug**：自定义奖励的配置键从顶层 `custom_reward_function` 改成了
+  `reward.custom_reward_function`，但旧键的迁移函数只在 fully-async 路径里被调用，走
+  `main_ppo.py` 时旧键被静默忽略——奖励函数接不上，回退到内置函数，遇到 `bird` 数据源
+  报 NotImplementedError。
+- **verl 0.9 默认值坑**：rollout 的 `tensor_model_parallel_size` 默认 2（单卡要改 1）、
+  `agent.num_workers` 默认 8（要和 batch 整除）。
+- 我们自己的一个 bug 也在 smoke 里暴露出来：`verl_reward.py` 的 rollout 日志是「攒够 200 条
+  才写」，smoke 只有十几条，导致 `rollouts.jsonl` 不落盘。已改成每条立即写。
+
+**最值钱的一条证据**：smoke 的第一条 rollout 日志就复现了里程碑 9 预言的现象——模型返回
+8212 行、标准答案 2180 行，官方口径给分（去重后相同）、严格口径不给分（行数不同）。
+两套验证器的分歧、用严格口径当奖励的必要性，在真实训练里被直接测量到了。
+
+### 还没验证的
+
+- **正式训练（batch 32、8191 题、300 步）没有跑**，只有 3 步 smoke。smoke 里 `reward/mean=0.15`
+  是「未经训练的模型在 2 条题上」的表现，**不能当作任何最终数字**。
+- smoke 里 `actor/loss`、`grad_norm` 都是 0，因为那 2 条题模型恰好全答错、reward 全 0，
+  advantage 也全 0。这是样本太少的正常现象，正式训练才会出现非零梯度。
+- SFT adapter 在数据盘丢失，**尚未重训**。正式 GRPO 前需要先补一轮 SFT（约 30 分钟），
+  否则是从原始模型直接训，和计划「从 SFT 后模型继续」不一致。
+- 训练侧依赖的完整 lock 文件（`pip freeze` 输出）还没生成，`requirements-train.txt` 只记录了
+  核心版本和 workaround。
+- 上面这些环境 workaround 都直接改在云上机器的 torch/verl 源码里，**尚未沉淀成可复现的脚本**，
+  换机器重配时仍要靠这份文档手工重做。

@@ -1,53 +1,56 @@
 # Training environment: Linux + NVIDIA GPU only. Do not install locally.
 #
-# STATUS: NOT YET PINNED. Nothing in this file has been installed or run.
-# Leaving it unpinned is the known risk documented in AGENTS.md, not an
-# oversight -- verl's trainer interfaces move fast enough that a version chosen
-# today without running it would be a guess dressed up as a lockfile.
+# STATUS: CONFIRMED WORKING END TO END (3-step GRPO smoke completed, 212 rollout
+# records written). Pinned on 2026-08-16 from the environment that actually ran.
 #
-# Fill it in like this, once, on the GPU box:
-#
-#   1. Install torch matching the box's CUDA, then vllm, then verl from source.
-#   2. Run verl's official gsm8k GRPO example end to end. Do not skip this --
-#      it separates "my reward function is wrong" from "my environment is wrong",
-#      and those two failures look identical from the logs.
-#   3. Only then: pip freeze > requirements-train.lock.txt, and record the verl
-#      commit sha and the lock date below.
-#
-# verl:         4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71  (0.9.0.dev0)
-#               plus `++transfer_queue.enable=False` on the command line
-# GPU:          single RTX 4090 24GB, AutoDL
-# CUDA / driver: <fill in>
-# STATUS:       not yet confirmed working end to end
-#
-# History, because this is the point of the file:
-#
-# 2026-08-08  Cloned verl at HEAD (4a2cba7) -- the runbook said `git clone`,
-#             not `git checkout <tag>`, despite AGENTS.md requiring a pin since
-#             day one. Config validation passed and Ray started, then the run
-#             died on `ModuleNotFoundError: No module named 'transfer_queue'`:
-#             HEAD carries a data component that the task runner imports but
-#             that is not a dependency yet. It is switchable off.
-#
-# 2026-08-08  Moved to the v0.8.0 tag to "fix" that. Worse: `pip install -e .`
-#             resolved numpy down from 2.3.2 to 1.26.4, which broke scipy,
-#             opencv and transformers. A working environment with one bad import
-#             was traded for a broken environment.
-#
-#             Lesson, and it is not the obvious one: pinning matters, but
-#             changing a pin *inside a working environment* is itself a
-#             dependency change. Reverted to the HEAD commit with
-#             `pip install --no-deps -e .` and numpy restored explicitly.
-#
-# Once a GRPO run completes end to end: `pip freeze > requirements-train.lock.txt`,
-# record the CUDA version above, and change STATUS.
+# These exact versions are a *compatible set*. Changing any one of them broke
+# the stack in a different way during the bring-up; see the history below.
 
-torch
-vllm
-verl
-transformers
-accelerate
-peft
-datasets
-flash-attn
-wandb
+# --- the compatible set (verified together) ---------------------------------
+torch==2.11.0+cu130
+vllm==0.24.0
+transformers==5.5.3
+# verl pinned to commit sha, checked out from source:
+#   https://github.com/volcengine/verl @ 4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71
+#   (0.9.0.dev0, locked 2026-08-08)
+# flash-attn is NOT installed and must stay out: its source build fails against
+# CUDA 13.0 (nvcc is 12.8), and vLLM 0.24 / verl 4a2cba7 only need its pure-Python
+# bert_padding helpers, which we replace with transformers + einops (see below).
+
+# --- hardware / driver ------------------------------------------------------
+# GPU:          NVIDIA RTX 6000D 84GB (Blackwell, sm_120), AutoDL single GPU
+# Driver:       595.71.05, CUDA 13.2 toolchain (torch compiled against cu130)
+
+# --- non-obvious workarounds that make this set run on Blackwell -------------
+#
+# 1. torch 2.11.0 has a Blackwell import bug (PyTorch #186220): torch._inductor
+#    re-registers flex_attention templates and grouped_mm extern kernels. Patch
+#    torch/_inductor/select_algorithm.py by commenting out two asserts:
+#      assert name not in self.all_templates, "duplicate template name"
+#      assert not hasattr(extern_kernels, name), f"duplicate extern kernel: {name}"
+#    (Safe: we run sdpa + enforce_eager, never torch.compile.)
+#
+# 2. verl 4a2cba7's attention_utils.py hard-imports flash_attn.bert_padding.
+#    Patch it to fall back to transformers.modeling_flash_attention_utils
+#    (_unpad_input/_pad_input/_index_first_axis) + einops.rearrange.
+#
+# 3. verl 0.9 renamed the custom reward config to reward.custom_reward_function
+#    (path/name). The legacy migrate_legacy_reward_impl() is only called on the
+#    fully-async path, so on main_ppo.py the top-level custom_reward_function key
+#    is silently ignored. Always write reward.custom_reward_function.path/name.
+#
+# 4. verl 0.9 rollout defaults tensor_model_parallel_size=2; single GPU needs
+#    actor_rollout_ref.rollout.tensor_model_parallel_size=1.
+#
+# 5. verl 0.9 agent.num_workers defaults 8; batch size must be divisible by it
+#    (set actor_rollout_ref.rollout.agent.num_workers to match the smoke batch).
+
+# --- history -----------------------------------------------------------------
+# 2026-08-08  Cloned verl HEAD 4a2cba7. transfer_queue import error -> trainer.use_v1=False.
+#             Then numpy/torch churn from moving to v0.8.0 and back (see git history).
+# 2026-08-16  Brought up on RTX 6000D (Blackwell). The compatible set above is the
+#             result of: torch 2.11 duplicate-template bug -> patched; torch 2.12
+#             nccl/cudnn/triton chain -> abandoned; vLLM 0.26/0.25 LoRA API clash
+#             with verl 4a2cba7 -> pinned vLLM 0.24.0; transformers 5.6.0 excluded
+#             by verl -> 5.5.3; flash-attn unbuildable -> transformers+einops fallback.
+#             3-step GRPO smoke then ran end to end (rollouts.jsonl, 212 records).
