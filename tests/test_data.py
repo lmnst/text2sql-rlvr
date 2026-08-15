@@ -164,10 +164,10 @@ class TestPrompt:
 
 
 class TestInstructionVersions:
-    """v1 is kept so the first baseline stays reproducible; v2 is the default."""
+    """v1 is the pinned prompt since milestone 7; v2 is kept for the negative result."""
 
-    def test_default_is_v2(self):
-        assert PromptConfig().instruction_version == "v2"
+    def test_default_is_v1(self):
+        assert PromptConfig().instruction_version == "v1"
 
     def test_v1_is_the_original_short_instruction(self, bird_root):
         split = discover_split(bird_root, "mini_dev")

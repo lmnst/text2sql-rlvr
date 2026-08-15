@@ -68,9 +68,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--descriptions", action="store_true", help="include column descriptions")
     parser.add_argument("--sample-rows", type=int, default=0)
     parser.add_argument("--no-evidence", action="store_true")
-    parser.add_argument("--instruction-version", choices=("v1", "v2"), default="v2",
-                        help="v1 reproduces the first baseline; v2 adds the dialect "
-                             "and pseudo-function rules")
+    parser.add_argument("--instruction-version", choices=("v1", "v2"), default="v1",
+                        help="v1 is the pinned prompt (SFT and RL train with it); "
+                             "v2 adds dialect and pseudo-function rules but measured "
+                             "worse on the validation set (see docs/PROGRESS.md)")
 
     parser.add_argument("--limit", type=int, default=0, help="first N examples, 0 for all")
     parser.add_argument("--resume", action="store_true", help="skip ids already in --out")
