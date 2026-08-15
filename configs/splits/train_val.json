@@ -2,7 +2,7 @@
  "source_questions": "data\\bird\\train\\train.json",
  "source_facts": "results\\gold_facts_train.jsonl",
  "source_facts_sha256": "b7d0faaee8dbf63efb7cbe2f9d44fc8a0e9d9e830c28d47da37c5ae4d59e47f4",
- "git_sha": "acc1b67c55c1563e7c3d5bed0dd51a91797ad705",
+ "git_sha": "0dc9aee268411fd2c4ce2bac34ed4f950a7a4fc0",
  "git_dirty": true,
  "command": "scripts/build_splits.py --facts results/gold_facts_train.jsonl",
  "n_train": 8191,

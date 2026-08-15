@@ -47,9 +47,21 @@ def read_facts(path: Path) -> list[GoldFacts]:
     ]
 
 
-def write_questions(path: Path, records: list[dict]) -> None:
+def write_questions(path: Path, records: list[tuple[int, dict]]) -> None:
+    """Write a BIRD-format question file, stamping each record with its original id.
+
+    BIRD's train.json has no ``question_id`` field, so :func:`load_examples` falls
+    back to the list index. Filtering and splitting rearrange that list, which would
+    silently turn the new index into a fake question_id. Stamping the id here keeps
+    it stable so downstream parquet and rollout logs trace back to the source split.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(records, ensure_ascii=False, indent=1), encoding="utf-8")
+    out = []
+    for qid, item in records:
+        stamped = dict(item)
+        stamped["question_id"] = qid
+        out.append(stamped)
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def describe(name: str, ids: tuple[int, ...], facts_by_id: dict[int, GoldFacts]) -> None:
@@ -83,8 +95,8 @@ def main(argv: list[str] | None = None) -> int:
     by_id = {int(item.get("question_id", i)): item for i, item in enumerate(raw)}
     train_path = args.out_dir / "train_filtered.json"
     val_path = args.out_dir / "val.json"
-    write_questions(train_path, [by_id[i] for i in plan.train_ids])
-    write_questions(val_path, [by_id[i] for i in plan.val_ids])
+    write_questions(train_path, [(i, by_id[i]) for i in plan.train_ids])
+    write_questions(val_path, [(i, by_id[i]) for i in plan.val_ids])
 
     summary = plan.summary()
     print(f"input                 {len(examples)} questions from {split.questions_path}")
