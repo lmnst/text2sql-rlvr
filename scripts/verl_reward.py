@@ -87,8 +87,6 @@ _EXECUTOR = SqlExecutor(timeout_s=float(os.environ.get("TEXT2SQL_REWARD_TIMEOUT"
 _STATS = RewardStats()
 _LOG_PATH = os.environ.get("TEXT2SQL_ROLLOUT_LOG", "")
 _LOG_LOCK = threading.Lock()
-_LOG_EVERY = int(os.environ.get("TEXT2SQL_LOG_FLUSH_EVERY", "200"))
-_BUFFER: list[str] = []
 
 
 def _db_path(extra_info: dict | None) -> Path:
@@ -102,16 +100,19 @@ def _db_path(extra_info: dict | None) -> Path:
 
 
 def _record(payload: dict) -> None:
+    """Append one rollout record to the log immediately.
+
+    Each rollout is written as its own line rather than buffered, so a short
+    smoke run (a handful of rollouts) still produces a readable log -- buffering
+    until N records silently dropped the entire smoke log.
+    """
     if not _LOG_PATH:
         return
+    path = Path(_LOG_PATH)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with _LOG_LOCK:
-        _BUFFER.append(json.dumps(payload, ensure_ascii=False))
-        if len(_BUFFER) >= _LOG_EVERY:
-            path = Path(_LOG_PATH)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as handle:
-                handle.write("\n".join(_BUFFER) + "\n")
-            _BUFFER.clear()
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
 def compute_score(
@@ -147,14 +148,8 @@ def compute_score(
 
 
 def flush() -> dict[str, float]:
-    """Write any buffered rollouts and return the running statistics."""
+    """Return the running reward statistics (logging is no longer buffered)."""
     with _LOG_LOCK:
-        if _LOG_PATH and _BUFFER:
-            path = Path(_LOG_PATH)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as handle:
-                handle.write("\n".join(_BUFFER) + "\n")
-            _BUFFER.clear()
         return _STATS.as_dict()
 
 
