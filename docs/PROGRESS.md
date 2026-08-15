@@ -761,3 +761,21 @@ GRPO 尚未训练，本轮是在上 GPU 前对本地仓库做的一次「可投�
   这一步需要仓库凭证，留待处理。
 - 本轮是在受限的沙箱环境里跑的 `pytest`，临时目录权限受限导致部分测试报 `PermissionError`，
   这是环境问题、不是代码问题；在正常终端里 `python -m pytest` 应全绿，这一点尚未在干净环境重新确认。
+
+### 补记：第三处隐患（同一轮发现并修复）
+
+**切分后的数据丢了原始 `question_id`。** BIRD 的 train.json 本身没有 `question_id` 字段，
+加载时靠「在列表里的位置」兜底生成。而 `build_splits.py` 把过滤重排后的题目写成
+`train_filtered.json` / `val.json` 时，没有把这个原始 id 写回去，于是下游读到的
+`question_id` 变成了**过滤后的新索引**（0–8190），而不是原始值（0–9427）。
+
+这不会影响训练和评测的正确性——奖励靠 `db_id` 定位数据库、靠 gold SQL 执行，`question_id`
+只进日志。但它会让错误分析阶段无法从 rollout 日志里的 `question_id` 直接定位原始题，
+而我在验证「训练/评测 prompt 是否逐字节一致」时就被它带偏过一次（按 question_id 找例子
+结果对错了题）。
+
+修复方式：`build_splits.py` 写文件时把原始 `question_id` 逐条盖回记录里，然后重新生成
+`train_filtered.json`、`val.json`、SFT 数据和 RL parquet。已验证：parquet 的 `question_id`
+恢复为原始值（train 0–9427、val 1359–7013），且用 `seed=0` 重新切分后 train/val 的
+题目集合与之前完全一致（切分是可复现的）；8 个数据库的 prompt 与评测逻辑逐字节一致。
+顺带把 manifest 里过时的 `chars_per_token_assumed`（3.3）修正为代码里已实装的 3.6。
