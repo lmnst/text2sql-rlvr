@@ -18,16 +18,18 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Datasets, databases, and model artifacts
-data/
+# Datasets, databases, and model artifacts. These are all *root-level* output
+# directories, anchored with a leading slash so they never shadow a package
+# directory deeper in the tree (e.g. src/text2sql_rlvr/data/).
+/data/
 *.sqlite
 *.sqlite3
 *.db
-checkpoints/
-models/
-wandb/
-outputs/
-logs/
+/checkpoints/
+/models/
+/wandb/
+/outputs/
+/logs/
 
 # Generated experiment artifacts
 results/*
