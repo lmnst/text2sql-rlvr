@@ -833,3 +833,50 @@ GRPO 尚未训练，本轮是在上 GPU 前对本地仓库做的一次「可投�
   核心版本和 workaround。
 - 上面这些环境 workaround 都直接改在云上机器的 torch/verl 源码里，**尚未沉淀成可复现的脚本**，
   换机器重配时仍要靠这份文档手工重做。
+
+---
+
+## 2026-08-16 · 里程碑 14：SFT 重训完成，正式 GRPO 训练启动（训练进行中）
+
+### 做了什么
+
+在 smoke 验证链路通后，补回了丢失的 SFT adapter，并把正式 GRPO 训练跑起来：
+
+1. **重训 SFT**。数据盘丢失后 SFT adapter 没了，但这次没有重装 LLaMA-Factory，而是新写了一个
+   轻量训练脚本（`scripts/train_sft.py`，约 120 行），直接用环境里已有的 transformers + peft
+   复现原先 `qwen3_1.7b_lora.yaml` 的全部配置（LoRA rank 32 / alpha 64 / lr 1e-4 / cosine /
+   1 epoch / qwen3 模板关 thinking）。训练 28 分钟跑完 512 步，`train_loss=0.2249`，
+   与里程碑 9 记录的形态一致。
+2. **合并 SFT 模型**为完整权重（3.4GB，`Qwen3-1.7B-sft-merged`），`run_grpo.sh` 的模型路径
+   指向合并产物。
+3. **启动正式 GRPO**（batch 32 × n 8 = 256 rollout/step），首步实测 232 秒——按 300 步算要
+   19 小时，果断停掉调优后重跑：步数 300→150、n 8→4、关闭 gradient checkpointing，
+   重跑后预计 3–4 小时。**训练当前正在跑。**
+
+### 为什么这么设计
+
+**SFT 不用 LLaMA-Factory，用 transformers+peft 直写。** 前一个晚上刚把 verl 环境从
+「Blackwell + torch + vLLM 版本矩阵」里调通，装 LLaMA-Factory 有真实风险把它搅坏
+（历史上已经发生过一次换版本毁环境）。SFT 本质就是 LoRA + 标准训练循环，LLaMA-Factory
+底层做的就是这些，直接调库复现同样的超参即可，结果也确实对得上（loss 曲线一致）。
+
+**三个提速手段逐个评估，不盲砍：**
+- 关 gradient checkpointing：它只是拿重算换显存，84GB 卡上显存余量大，关掉**结果零变化**、
+  纯提速约 30%，必做。
+- n 8→4：论文推荐 8，但 4 是公认的有效下限，对小模型最终指标影响通常在 1 个点以内，
+  换来每步时间减半，划算。
+- 300→150 步：不是拍脑袋砍半，而是 SFT 后的 GRPO 通常几十到一百多步见顶；保留
+  `test_freq=25` 每 25 步自动测验证集，**用 val 曲线决定停不停**，而不是预先猜一个步数。
+
+**顺带修了一个 transformers 5.x 兼容问题**：`apply_chat_template(tokenize=True)` 在新版
+返回 dict 而不是 list，导致训练集 collate 报 `Could not infer dtype of dict`。改为
+`tokenize=False` 取文本再手动 encode，绕开版本差异。
+
+### 还没验证的
+
+- **正式 GRPO 的结果没有出来**：reward 曲线、val 曲线、最终 checkpoint 的 mini-dev 分数，
+  全部待训练完成后评测。本次训练配置为 150 步、n=4、关 gc、严格奖励，与 smoke 和
+  里程碑 10 的原始计划（300 步、n=8）不同，汇报时必须注明。
+- 对照实验（execution_bonus=0.3）未跑。
+- 简历叙事尚未定稿：如果 GRPO 无明显提升，按纪律转成「RLVR 边界验证 + reward hacking
+  案例」的诚实叙事，`docs/resume-draft.md` 已预留两种方向。

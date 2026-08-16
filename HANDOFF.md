@@ -1,88 +1,80 @@
-# 项目交接
+# 项目交接（2026-08-16 更新）
 
 ## 先读什么
 
-按以下顺序了解项目，不要依赖旧聊天记录：
+1. `AGENTS.md`：数据划分、实验记录和真实性规则（不可违反）。
+2. `docs/PROGRESS.md`：全部里程碑历史，最新到「里程碑 14：正式 GRPO 训练启动」。
+3. `docs/resume-draft.md`：简历草稿，GRPO 数字留空待填。
+4. `requirements-train.txt`：训练环境钉死的版本组合 + 5 条 Blackwell workaround。
+5. `results/runs.jsonl`：可对外引用的实验台账。
 
-1. `AGENTS.md`：数据划分、实验记录和真实性规则。
-2. `docs/PROGRESS.md`：按时间记录已完成工作、设计理由和未验证项。
-3. `results/runs.jsonl`：能够对外引用的实验台账。
-4. `docs/grpo-runbook.md`：当前 GRPO 环境与操作步骤。
+## 当前状态（最重要的一段）
 
-## 当前状态
+**主线：正式 GRPO 训练正在 AutoDL 上跑**（2026-08-16 14:40 左右启动，预计 3–4 小时）。
 
-当前主分支为 `main`。截至 2026-08-09：
+- 训练配置：严格奖励、150 步、rollout n=4、关 gradient checkpointing、batch 32、
+  `test_freq=25`（每 25 步自动测验证集）、SFT 合并模型为起点。
+- 云上日志：`/root/autodl-tmp/grpo_train.log`（nohup 后台，SSH 断连不中断）。
+- 查进度：`grep "Training Progress" /root/autodl-tmp/grpo_train.log | tail -1`
+- 查 reward/val：`grep -oE "(reward/mean|val-core)[^ ]*" /root/autodl-tmp/grpo_train.log | tail`
 
-- Qwen3-1.7B 未训练基线在 BIRD mini-dev 500 题上为
-  `official_ex=19.80%`、`strict_ex=17.40%`。
-- 一轮 LoRA SFT 后为 `official_ex=34.60%`、`strict_ex=30.00%`。
-- GRPO 的数据、严格执行奖励、运行脚本和 rollout 分析工具已经实现。
-- GRPO smoke test 尚未跑通，因此没有 GRPO 结果，也没有 reward-hacking
-  对照实验结果。不要把配置或计划写成已经验证。
+**已验证完成的链路**（全部有证据）：
 
-当前唯一主线是迁移到单卡 48 GB 实例，先跑通 GRPO smoke，再决定正式训练。
+| 环节 | 状态 |
+|---|---|
+| BIRD 数据/评测/只读 SQL 沙箱/双验证器 | ✅ 长期完成，本地测试全绿 |
+| Qwen3-1.7B 基线（mini-dev 500 题） | ✅ 官方 EX 19.80%（runs.jsonl） |
+| LoRA SFT 1 epoch | ✅ 官方 EX 34.60%（runs.jsonl）；本次用 `scripts/train_sft.py` 重训复现，loss 0.2249 与历史一致 |
+| GRPO 三步 smoke | ✅ 3 step 跑通，rollouts.jsonl 212 行，第一条即复现「official 给分 / strict 不给分」案例 |
+| 正式 GRPO 训练 | ⏳ **进行中**（本交接时的主线） |
+| 对照实验（exec bonus） | ⬜ 未跑 |
+| val/mini-dev 最终评测 | ⬜ 待 GRPO 完成后 |
 
-## 当前卡点
+## 云上环境（AutoDL，勿轻易动）
 
-最近一次在单卡 RTX 4090 24 GB 上的调试已经依次越过配置解析、Ray 初始化、
-vLLM 初始化，并走到第一次把 actor 权重同步给 vLLM。已确认三处兼容问题：
+- 机器：单卡 RTX 6000D 84GB（Blackwell sm_120），已开机，**关机安全（数据保留），
+  释放/保存镜像会丢数据盘**。
+- 版本组合（已钉死，见 `requirements-train.txt`）：torch 2.11.0+cu130、vLLM 0.24.0、
+  verl commit `4a2cba76`（0.9.0.dev0，源码在 `/root/verl`）、transformers 5.5.3。
+- 数据盘 `/root/autodl-tmp/` 关键内容：
+  - `Qwen3-1.7B/`（基座）、`Qwen3-1.7B-sft-merged/`（SFT 合并模型，3.4GB）
+  - `train/`（BIRD train 数据：`train.json` + `train_databases/` 69 库）
+  - `rl/`（train.parquet 8191 行 + val.parquet 200 行）、`src/`（项目包）、`verl_reward.py`
+  - `run_grpo.sh` / `run_smoke.sh`（训练脚本，已含全部配置修正）
+  - `out/qwen3-1.7b-sft-lora/`（SFT adapter）、`out/grpo_smoke/rollouts.jsonl`（smoke 日志）
 
-- `trainer.use_v1=False`：绕开会导入缺失 `transfer_queue` 的新版任务运行器。
-- 模型要求 FlashAttention2、环境未安装：覆盖为 PyTorch `sdpa`。
-- AutoDL 容器不支持 vLLM 睡眠模式需要的 cuMem 接口：必须同时设置
-  `rollout.enable_sleep_mode=False` 和 `rollout.free_cache_engine=False`。
+**云上对第三方源码做过 3 处手改（换机器必须重做，方法见 requirements-train.txt）**：
+1. `torch/_inductor/select_algorithm.py`：注释两行 assert（PyTorch #186220 Blackwell 重复注册 bug）。
+2. `verl/utils/attention_utils.py`：flash_attn.bert_padding 改为 transformers + einops 回退。
+3. `run_grpo.sh`：奖励键名 `reward.custom_reward_function.*`（verl 0.9 顶层键迁移只在
+   fully-async 路径执行，v0 路径必须直接写新键名）、`tensor_model_parallel_size=1`、
+   `agent.num_workers=4`。
 
-只关 `free_cache_engine` 不够：它只控制后续是否调用 sleep；
-`enable_sleep_mode` 会直接传给 vLLM，并在初始化时触发 cuMem 检查。
+## 本地仓库状态
 
-关闭睡眠模式后，当前 vLLM/verl 组合又在 LoRA IPC 注入时触发
-`IndexError: tuple index out of range`。设置 `model.lora.merge=True` 后确认切换到了
-“先把 LoRA 合入权重、再走普通权重同步”的路径，绕过了 `add_lora()`。
+- `main` 领先 `origin/main` 8+ 个 commit（含 3 处可投递性隐患修复、question_id 修复、
+  训练版本钉死、PROGRESS 里程碑 12-14）。**待 push**（需要 GitHub 凭证）。
+- 未追踪新文件：`scripts/train_sft.py`、`docs/resume-draft.md`（本交接后应 commit）。
 
-4090 上最后的真实失败是第一次完整权重同步时 OOM，而非显存碎片：actor/FSDP
-约占 13.21 GiB，vLLM 约占 10.20 GiB，整卡只剩 93 MiB，随后复制
-`lm_head.weight` 还需约 1.16 GiB。**尚未产生 rollout、reward、训练 step 或 checkpoint。**
+## 下一步（GRPO 跑完后，按顺序）
 
-因此当前决定是换一张 48 GB 卡，不先做双卡。原因是双卡会同时引入 FSDP、张量并行和
-NCCL 的新变量；48 GB 单卡更适合先证明链路成立。A40 更省钱，L40/L40S/RTX 6000 Ada
-更快；这只是选型建议，不是已经租用或跑通的结果。
+1. **看 val 曲线决定是否续跑**：`grep "val-core" grpo_train.log`。若 150 步内 val 已见顶，
+   不必续；若仍在涨，把 `TOTAL_STEPS=150` 提到 200 续跑。
+2. **导出 checkpoint → vLLM serve → 本地 generate/evaluate**（先 val 再 mini-dev，
+   `--instruction-version v1`，两套口径都报，`--stage grpo` 写台账）。
+3. **对照实验**：`TEXT2SQL_REWARD_EXEC=0.3 OUT=/root/autodl-tmp/out/grpo_naive /root/autodl-tmp/run_grpo.sh`
+   再训一次，用 `scripts/analyze_rollouts.py --rollouts out/grpo_naive/rollouts.jsonl`
+   对比 no_from / hack 率。
+4. **收尾**：错误分析 → 填 `docs/resume-draft.md` 的数字 → 更新 README 的 Status →
+   追加 PROGRESS 里程碑 15 → push 全部。
 
-当前 AutoDL 旧实例已关机、未释放。关机前已运行 `sync`，并生成：
-
-```text
-/root/autodl-tmp/handoff_20260809.tar.gz
-```
-
-截图确认合并后的 SFT 模型约 3.3 GB、RL 数据目录约 3.3 MB；
-`/root/autodl-tmp/bird` 当时不存在，所以迁移后必须重新定位或下载 BIRD train 数据库。
-没有有效的 GRPO checkpoint 需要抢救。
-
-## 下一步
-
-1. 在 AutoDL 同一区域用“克隆实例”迁移旧实例到单卡 48 GB，并勾选复制数据盘；
-   旧实例先保留，等新实例验收后再释放。
-2. 在新实例确认模型、RL 数据、交接压缩包和 verl commit
-   `4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71`，不要升级或降级依赖。
-3. 找回或重新下载 BIRD train 数据库，确认
-   `$TEXT2SQL_DB_ROOT` 指向真实的 `train_databases`。
-4. 从最新 Git 仓库复制 `configs/grpo/run_grpo.sh`、`run_smoke.sh`、奖励脚本和 `src/`
-   到 `/root/autodl-tmp/`，再按 `docs/grpo-runbook.md` 运行奖励自检和三步 smoke。
-5. 确认至少完成一个训练 step，并产生
-   `rollouts.jsonl`；失败时保存完整报错和实际 verl commit。
-6. smoke 通过后先提交环境配置与证据，再运行严格奖励版本；严格版本稳定后，
-   才运行 `TEXT2SQL_REWARD_EXEC=0.3` 的朴素奖励对照。
-
-## 换电脑后恢复
+## 换电脑恢复
 
 ```bash
 git clone https://github.com/lmnst/text2sql-rlvr.git
 cd text2sql-rlvr
 pip install -r requirements-dev.txt
-python -m pytest
+python -m pytest          # 本地测试应全绿（数据不依赖 BIRD）
 ```
 
-Git 仓库不包含 BIRD 数据、模型、checkpoint、预测文件或训练输出。
-本地数据按 `docs/data.md` 重新获取；GPU 环境按 `docs/gpu-runbook.md` 和
-`docs/grpo-runbook.md` 重建。密钥和云服务器登录信息不应写入仓库。
-
-继续工作前先运行 `git status`，再阅读最新 commit 和本文件。
+BIRD 数据按 `docs/data.md` 重下；GPU 环境按 `requirements-train.txt` + 本文件「云上环境」一节重建。
