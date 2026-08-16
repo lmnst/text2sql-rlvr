@@ -44,6 +44,12 @@ transformers==5.5.3
 #
 # 5. verl 0.9 agent.num_workers defaults 8; batch size must be divisible by it
 #    (set actor_rollout_ref.rollout.agent.num_workers to match the smoke batch).
+#
+# 6. vllm serve on SM120 crashes in flashinfer sampling ("FlashInfer requires
+#    GPUs with sm75 or higher" -- capability detection fails on sm_120, vLLM PR
+#    #44405). Start serving with:
+#      VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_ATTENTION_BACKEND=TRITON_ATTN \
+#      vllm serve <model> --enforce-eager ...
 
 # --- history -----------------------------------------------------------------
 # 2026-08-08  Cloned verl HEAD 4a2cba7. transfer_queue import error -> trainer.use_v1=False.
