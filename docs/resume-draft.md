@@ -1,52 +1,97 @@
-# 简历项目经历草稿（Text2SQL-RLVR）
+# Text2SQL-RLVR 简历素材
 
-> 状态：草稿。带 `___` 的数字是还没跑出来的，**填之前必须能从
-> `results/runs.jsonl` 定位到唯一一行**，否则按 AGENTS.md 一律不写。
-> 已填的数字全部有台账依据：baseline/SFT 来自 runs.jsonl 第 1-6 行。
+本文件只使用 `results/runs.jsonl` 中可唯一定位、`git_dirty=false` 的正式实验数字。
+推荐简历正文使用前三条；GRPO 的负结果留到面试追问时展开。
 
----
+## 中文版：推荐三条
 
-## 项目经历（简历 bullet 版）
+**Text2SQL-RLVR：基于执行反馈的 Text-to-SQL 训练与评测系统**
 
-**Text2SQL-RLVR：基于执行反馈的 Text-to-SQL 强化学习**（Qwen3-1.7B · verl/GRPO · vLLM · LoRA）
+Qwen3-1.7B · verl/GRPO · vLLM · LoRA/PEFT · SQLite · BIRD
 
-- 构建「生成 SQL → 只读数据库执行 → 执行结果正确性作为奖励」的完整 RLVR 管线，在 BIRD 基准上以 GRPO 训练 Qwen3-1.7B；BIRD Mini-Dev（500 题）执行准确率从基线 19.80% 提升至 SFT 后 34.60%。GRPO 的修正实验未观察到可测量提升，正式台账补齐前不在简历中报告其数字。
-- 设计并实现双验证器：复刻 BIRD 官方 `set(pred)==set(gold)` 口径用于主奖励与对外汇报，自研保留行序与重复行的严格验证器作为训练监控；两者之差即 reward hacking 的直接度量，实测训练集 8.7%（770/9428）的题目可利用「空结果 / 去重」在未严格答对时获得官方分数。
-- 实现安全 SQL 执行沙箱（三层防护：只读打开 + SQLite authorizer + 文本预检；硬超时 + 结果缓存 + 连接池），支撑 GRPO 训练中每步数百次 SQL 执行；训练吞吐瓶颈从 GPU 转移到 reward 计算，已针对性优化。
-- 主导 GRPO 环境攻坚：在 Blackwell 新架构（RTX 6000D）+ verl 0.9 配置大改版 + vLLM LoRA API 重构的三重版本冲突下，定位并解决 PyTorch #186220（torch 2.11 Blackwell 模板重复注册）、verl 0.9 奖励配置键迁移失效等十余个兼容性问题，锁定一套可复现版本组合。
-- 设计并运行 reward hacking 对照实验：开关「SQL 可执行即给分」的奖励项，对比训练过程中 `SELECT 1` 类退化输出占比（hack rate）与正确率曲线，量化复合奖励下的投机行为（结果：___）。
-- 工程规范：实验台账（runs.jsonl）自动记录 git 版本/硬件/解码参数/划分/样本数；train/val/dev 数据划分纪律（dev 只在最终评测使用一次）；训练与评测 prompt 逐字节一致性校验。
+- 构建从 BIRD 数据处理、LoRA SFT、vLLM 并发生成到数据库执行奖励和 verl GRPO 的完整链路；
+  Qwen3-1.7B 在 BIRD Mini-Dev 500 题上的官方执行准确率由 19.80% 提升至 SFT 后 34.60%。
+- 实现基于问题与 evidence 的 schema linking，并通过同 checkpoint、同 788 题、确定性解码的
+  受控实验，将官方 EX 从 full schema 的 32.87% 提升至 linked schema 的 37.94%。
+- 实现 SQLite 只读执行沙箱与官方/严格双验证器：使用 immutable 只读连接、authorizer、单语句
+  校验、硬超时和结果缓存隔离模型 SQL；主指标复刻 BIRD official EX，严格指标保留重复行并监控
+  指标利用，实验台账自动记录 Git SHA、配置哈希、划分、解码参数和逐题结果。
 
-## 量化结果（表格版，用于面试展开）
+## 中文版：如果版面允许加第四条
 
-| 阶段 | 数据划分 | 官方 EX | 严格 EX | 依据 |
-|---|---|---|---|---|
-| Qwen3-1.7B 基线 | Mini-Dev 500 题 | 19.80% | 17.40% | runs.jsonl |
-| + LoRA SFT 1 epoch | Mini-Dev 500 题 | 34.60% | 30.00% | runs.jsonl |
-| + GRPO（严格奖励） | val 788 题 | 待正式记录 | 待正式记录 | 修正实验诊断为无可测量提升 |
-| + GRPO | Mini-Dev 500 题 | 待测 | 待测 | 未评测 |
-| GRPO 对照（exec bonus=0.3） | val | 待跑 | 待跑 | 未跑 |
+- 对齐训练与评测口径，用 BIRD official EX 重跑 linked-schema 普通 GRPO；固定 train-val 788 上
+  由 37.94% 变为 38.20%，判定为无明确增益，并将稀疏二值奖励和有效 group
+  不足作为下一步诊断方向，而非选择性汇报正向数字。
 
-关键中间数据（可支撑面试问答）：
-- 训练集 gold 自身不可执行 370/9428（3.9%），已在切分时过滤；gold 空结果 283 题（3.0%）、含重复行 487 题（5.2%），合计 8.2% 官方口径可利用面。
-- SFT 提升拆解：mini-dev 净增 74 题中，53 题来自「修掉格式/方言错误」（执行失败 207→107，方言类 63→1），51 题来自真实查询能力提升——报告中主动区分，不把格式修复算作能力提升。
-- 官方口径与严格口径分歧：SFT 后 mini-dev 上 25 题官方给分、严格不给分，全部为「漏写 DISTINCT」形状（如模型 933 行 vs gold 21 行），直接支撑「用严格验证器当奖励」的决策。
+第四条适合研究型岗位或面试材料；一页中文简历通常不放，以免弱结果抢占项目主贡献。
 
-## 技术栈
+## English version
 
-PyTorch · verl(GRPO) · vLLM · LoRA/PEFT · SQLite · BIRD · Ray · Python
+**Text2SQL-RLVR — Execution-grounded training and evaluation for Text-to-SQL**
 
----
+Qwen3-1.7B · verl/GRPO · vLLM · LoRA/PEFT · SQLite · BIRD
 
-## 待补（跑完后回来填）
+- Built an end-to-end pipeline covering BIRD preprocessing, LoRA SFT, concurrent vLLM
+  generation, database-execution rewards, and verl GRPO; improved BIRD Mini-Dev official
+  execution accuracy from 19.80% to 34.60% after SFT on Qwen3-1.7B.
+- Implemented question/evidence-based schema linking and evaluated it with a controlled,
+  deterministic 788-example comparison on the same checkpoint, improving official EX from
+  32.87% with the full schema to 37.94% with the linked schema.
+- Implemented a read-only SQLite execution sandbox and dual verifiers using immutable
+  connections, an authorizer, single-statement validation, hard timeouts, and result caching;
+  recorded Git revision, config hash, split, decoding settings, and per-example outcomes in an
+  append-only experiment ledger.
 
-- [ ] corrected GRPO 的 val 与 Mini-Dev 最终 EX
-- [ ] 对照实验的 hack rate / no_from rate 曲线结论（**建议第一优先**，这是本项目最值钱的素材：
-      「SQL 能跑就给分」开关下，量模型多快学会 `SELECT 1` 骗分；不依赖 GRPO 提升，大概率有戏剧性结果）
-- [ ] 错误分析结论（官方-严格分歧随训练的变化；GRPO 下降的 31 题 official-not-strict 等）
-- [ ] 硬件与训练耗时（单卡 84GB，150 步 × 102.7s ≈ 4.3 小时）
+Optional research-oriented bullet:
 
-## 叙事建议
+- Re-ran ordinary GRPO with BIRD official EX as the reward and linked-schema prompts; the paired
+  788-example evaluation changed official EX from 37.94% to 38.20%, which was reported
+  as no clear gain and motivated an analysis of sparse binary rewards and zero-variance groups.
 
-先等 corrected run。旧 GRPO 的训练 reward 曲线可以用于排障，但因为直接 SFT 对照缺失，
-不能再把「低于 SFT 3.7 个点」写成项目结论。
+## 正式结果与依据
+
+| 阶段 | 划分 | n | official EX | strict EX | run_id |
+|---|---|---:|---:|---:|---|
+| Qwen3-1.7B baseline | Mini-Dev | 500 | 19.80% | 17.40% | `43bb66bbe1e8` |
+| LoRA SFT | Mini-Dev | 500 | 34.60% | 30.00% | `f1ef9b247255` |
+| 强 SFT + full schema | 固定 train-val | 788 | 32.87% | 28.68% | `74d4d83c087c` |
+| 强 SFT + linked schema | 固定 train-val | 788 | 37.94% | 33.63% | `3b9e91f891d8` |
+| official-reward GRPO + linked schema | 固定 train-val | 788 | 38.20% | 33.88% | `53d1586c7d33` |
+
+Mini-Dev 与固定 train-val 是不同划分，不跨表直接比较。38.20% 不是 BIRD dev 成绩。
+
+## 面试时怎么讲
+
+### 30 秒版本
+
+项目目标是验证执行反馈能否改进小模型 Text-to-SQL。我先做了只读 SQL 沙箱和官方评测复刻，
+再完成 Qwen3-1.7B 的 SFT 与 GRPO。排查发现完整 schema 并未超过上下文上限，但大量无关表会
+干扰 1.7B 模型；加入轻量 schema linking 后，固定 val 788 上官方 EX 提升 5.07 个百分点。
+之后把 GRPO reward 与 BIRD official 对齐并公平重跑，结果只净增 2 题，因此最终把 schema
+筛选作为主要贡献，把 GRPO 作为边界验证而不是硬说成功。
+
+### 如果追问“GRPO 为什么没涨”
+
+先说证据，再说假设：训练正常跑满，没有截断、显存错误或 entropy collapse；多个 checkpoint
+的固定 val 没有继续改善，完整 val 的变化也很小。最可能的机制是 SQL 的 0/1 execution reward
+过于稀疏，n=4 时很多组可能全错或全对，组内 advantage 为零；其次是 500 prompt、30 step 和
+1.7B 模型能力限制。有效 group 比例尚未统计，所以必须说“待验证假设”，不能说已经证明。
+
+### 如果追问“为什么 official 和 strict 都要有”
+
+BIRD official 是最终考试口径，所以主奖励必须与它对齐；但 official 使用集合比较，会忽略重复
+行。strict 保留重复行并检查列数，用来监控模型是否只学会利用评分规则。两者职责不同，不应该
+用 strict 替换最终指标，也不应该因为 official 是官方指标就停止监控。
+
+## 不要写的内容
+
+- “GRPO 显著提升了准确率”——正式对照只从 37.94% 变为 38.20%。
+- “BIRD dev 达到 38.20%”——该数字来自 BIRD train 中固定划出的 val，dev 未读取。
+- “解决了 schema linking”——轻量 linker 仍会漏必要表并保留干扰表。
+- “完成 reward-hacking 对照实验”——execution bonus 对照没有运行。
+- 训练集攻击面、吞吐优化幅度、错误类型数量等没有唯一 ledger 行的数字。
+
+## 写简历时的取舍
+
+一页简历优先保留 schema linking、SFT 提升和安全评测基础设施。不要为了让标题中的 RL 看起来
+更成功而虚构增益；项目真正有价值的地方是完成了公平实验，并能解释哪个改动有效、哪个无效。

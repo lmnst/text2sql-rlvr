@@ -1,7 +1,8 @@
 # Training environment: Linux + NVIDIA GPU only. Do not install locally.
 #
-# STATUS: CONFIRMED WORKING END TO END (3-step GRPO smoke completed, 212 rollout
-# records written). Pinned on 2026-08-16 from the environment that actually ran.
+# STATUS: CONFIRMED WORKING END TO END. A 3-step smoke and the final 30-step
+# official-reward GRPO run, checkpoint export, vLLM serving, and deterministic
+# evaluation all completed on this stack. Pinned from the 2026-08-17 environment.
 #
 # These exact versions are a *compatible set*. Changing any one of them broke
 # the stack in a different way during the bring-up; see the history below.

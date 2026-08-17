@@ -1,334 +1,247 @@
-# GRPO：让模型自己试错
+# GRPO 最终运行手册
 
-到这一步为止的成绩：
+这份手册记录已经跑通的普通 GRPO 路径，不再是早期的换卡计划。历史 OOM、thinking 模板错误、
+旧 strict-reward 训练和每次订正保留在 `docs/PROGRESS.md`，不作为当前默认配置。
 
-| | 未训练 | SFT |
-|---|---|---|
-| val（788 题） | 21.83% | 33.38% |
-| mini-dev（500 题） | 19.80% | 34.60% |
+## 最终结论
 
-## 这一步和 SFT 有什么不同
+最终实验使用 linked schema 和 BIRD official EX 主奖励，在固定 train-val 788 上从 SFT 的
+37.94% official EX 变为 GRPO 的 38.20%。这个变化按“没有明确额外收益”处理。
 
-SFT 是**照着标准答案抄**。GRPO 是：同一道题让模型写 8 个不同的答案，
-把 8 个答案分别拿到数据库上执行，对的给 1 分错的给 0 分，
-然后**鼓励得分高于这组平均分的写法，抑制低于平均的**。
+GRPO 链路本身已经验证完成：训练、定期 val、LoRA checkpoint、verl 0.9 `.pt` 权重重建、
+Hugging Face 合并模型、vLLM 服务、确定性生成和双指标评测均已跑通。
 
-关键区别在于，模型可以写出和标准答案完全不同、但执行结果一样正确的 SQL，照样得满分。
-SFT 做不到这一点——写法不同就算错。
+## GRPO 在这里做什么
 
-奖励不来自人工标注，也不来自另一个模型打分，而是来自**真实数据库的执行结果**。
-这就是这个项目名字里 RLVR 的含义。
+同一道题生成多个 SQL，分别在只读数据库上执行。BIRD official EX 正确记 1，错误记 0；GRPO
+根据同组样本的相对奖励更新策略。因此一组样本全 0 或全 1 时没有组内排序信号，只有同时包含
+正确和错误答案的 mixed group 能提供直接相对优势。
 
-## 当前奖励决策（2026-08-17）
+SFT 是模仿 gold SQL；GRPO 允许模型使用与 gold 写法不同、但执行结果等价的 SQL。代价是
+execution reward 只有整题 0/1，不能告诉模型错在表、JOIN 还是过滤条件。
 
-主奖励改为 **BIRD official Execution Accuracy**，因为它是最终选择 checkpoint 和对外汇报的指标。
-严格验证器不再决定主奖励，但每条 rollout 仍同时记录 strict、official 以及两者的分歧。
-如果 official 上升而 strict 下降或 `hack_rate` 上升，必须检查是否只是利用了官方集合去重规则，
-不能把它直接写成查询能力提升。
+## 当前奖励口径
 
-下面保留的是此前选择 strict reward 的历史依据。它解释了为什么 strict 仍是必要的监控指标，
-但不再代表当前默认训练配置。
+- 主奖励：BIRD official Execution Accuracy；
+- 监控指标：strict execution equivalence；
+- `format_bonus=0`；
+- `execution_bonus=0`；
+- 训练期 SQL timeout 默认 10 秒；
+- rollout 逐条写入 `TEXT2SQL_ROLLOUT_LOG`。
 
-## 历史方案：strict reward 的依据
+为什么不是 strict 主奖励：最终 checkpoint 和对外成绩按 BIRD official 选择，训练目标必须与考试
+口径一致。为什么还保留 strict：official 集合比较会忽略重复行，strict 能发现某些官方判对但结果
+语义不完整的查询。两者职责不同。
 
-此前使用严格验证器而不是 BIRD 官方口径，依据来自里程碑 9：
+## 已验证环境
 
-SFT 之后有 25 道题，官方口径给分而严格口径不给。全部是同一个形状——
-标准答案写了 `SELECT DISTINCT` 返回 21 行，模型漏写返回 933 行，
-官方口径两边各自去重后判为相同，照给满分。
+依赖和 Blackwell workaround 以 `requirements-train.txt` 为准：
 
-**如果拿官方口径当奖励，模型在"要不要去重"上完全不受约束**：
-返回 933 行和返回正确的 21 行得分一模一样。强化学习会放大一切没有压力的方向。
+- Linux + 单张 Blackwell GPU；
+- torch 2.11.0+cu130；
+- vLLM 0.24.0；
+- transformers 5.5.3；
+- verl commit `4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71`。
 
-**默认不给部分分。** 奖励函数里有两个开关（`format_bonus`、`execution_bonus`），
-默认都是 0。`execution_bonus` 是"SQL 能跑就给分"，而 `SELECT 1` 就能跑——
-这是个明摆着的漏洞。
+不要在已工作的环境里随意升级其中一个包。verl、vLLM、transformers 和 torch 的接口强耦合，
+单独升级会把已确认的配置问题重新引入。
 
-**留着这个开关不是疏忽，它就是实验本身**：打开它，量模型多快找到这个漏洞、
-输出退化成什么样；关掉它，再量一次。两种设置都是一等公民，都会被记录。
+## 训练前检查
 
----
-
-## 2026-08-09 实际调试断点
-
-在 AutoDL 单卡 RTX 4090 24 GB、verl commit
-`4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71` 上，初始化已经走到第一次
-actor-to-vLLM 权重同步，但**没有完成任何训练 step**。
-
-已从源码和实际调用路径确认：
-
-- `rollout.enable_sleep_mode` 传给 vLLM，决定初始化时是否启用 cuMem 睡眠能力；
-- `rollout.free_cache_engine` 决定训练过程中是否调用 sleep/release；
-- AutoDL 当前容器不支持 cuMem，所以两项必须同时为 `False`，只关后一项无效；
-- 当前 verl/vLLM 组合的 LoRA IPC 注入会在 `add_lora()` 中报张量维度错误；
-  `model.lora.merge=True` 已确认能切换到先合并 LoRA、再同步普通权重的路径。
-
-这条合并路径在 24 GB 卡上首次同步权重时真实 OOM：actor/FSDP 约占 13.21 GiB，
-vLLM 约占 10.20 GiB，只剩 93 MiB，而复制 `lm_head.weight` 还需要约 1.16 GiB。
-reserved-but-unallocated 只有约 108 MiB，因此这次不是碎片问题。
-
-下一次计划在单卡 48 GB 上运行 `run_smoke.sh`。脚本已把 smoke 收缩到
-batch 2、每题 2 个 rollout，并启用 CPU offload、eager 模式和 `max_num_seqs=4`；
-这些参数是待验证的保守起点，不是已跑通配置。
-
-## 第 0 步：本地已经做完
-
-```
-data/processed/rl/train.parquet    8191 条
-data/processed/rl/val.parquet       200 条（训练中定期评测用）
-configs/grpo/dataset.json          这份数据怎么来的
-scripts/verl_reward.py             奖励函数，verl 调用它
-configs/grpo/run_grpo.sh           正式训练
-configs/grpo/run_smoke.sh          三步冒烟
-```
-
-奖励函数有 30 多条单元测试，逐一钉死了每种输出形状的得分：
-正确答案 1 分；写法不同但结果对，也是 1 分；`SELECT 1` 零分；
-漏写 DISTINCT 零分（并记录"官方口径本会给分"）；企图写库的直接拒绝。
-
-## 第 1 步：把 SFT 的适配器合并成完整模型
-
-GRPO 要在 SFT 的基础上继续训。适配器套适配器容易出问题，先合并成一个完整模型：
+### 1. 本地测试
 
 ```bash
-llamafactory-cli export --model_name_or_path /root/autodl-tmp/Qwen3-1.7B --adapter_name_or_path /root/autodl-tmp/out/qwen3-1.7b-sft-lora --template qwen3 --finetuning_type lora --export_dir /root/autodl-tmp/Qwen3-1.7B-sft-merged --export_size 5
+pip install -r requirements-dev.txt
+python -m pytest -q
 ```
 
-合并完确认目录里有 `config.json` 和 `.safetensors`。
+### 2. 数据纪律
 
-## 第 2 步：装 verl，先跑通它自带的例子
+- reward 只能读取 BIRD train gold SQL 和 train 数据库；
+- train/val 固定切分和 seed 必须写入 manifest；
+- val 用于 checkpoint 选择；
+- BIRD dev 不参与训练、调参或 early stopping。
 
-**这一步不要跳。** 它把"我的奖励函数写错了"和"我的环境装坏了"这两种情况分开——
-这两者的报错长得一模一样。
+linked-schema RL 数据由同一份 prompt 代码生成：
 
 ```bash
-git clone https://github.com/volcengine/verl /root/verl
-cd /root/verl && git checkout 4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71 && pip install -e .
+python scripts/build_rl_data.py \
+  --root /root/autodl-tmp \
+  --train /path/to/fixed_train.json \
+  --val /path/to/fixed_val.json \
+  --out-dir /root/autodl-tmp/rl-linked \
+  --schema-mode linked \
+  --val-subset 200 \
+  --val-seed 0 \
+  --val-subset-json /root/val200.json
 ```
 
-这个 commit 上的新版任务运行器（`TaskRunnerV1`）会无条件 import 一个叫
-`transfer_queue` 的新数据组件，而它还不是依赖。
+不要重新随机切分后与旧结果比较。
 
-**解决办法是绕开整个运行器，不是关掉那个组件**：脚本里已经加了
-`trainer.use_v1=False`，verl 会改用旧版运行器（`main_ppo_v0`），后者不 import 它。
+### 3. 奖励自检
 
-这个区别值得留意：那个 import 在 `run()` 方法的第一行，
-早于任何配置生效，所以 `transfer_queue.enable=False` 之类的开关根本管不到它。
-**能被配置关掉的是功能，管不住的是 import。**
+在 GPU 训练前单独调用 `scripts/verl_reward.py`，确认：
 
-### 这一段是踩过两次坑之后写的
+- 正确 SQL：official reward 1；
+- `SELECT 1`：0；
+- 非 SQL：0；
+- 写库语句：拒绝；
+- strict 与 official 都写入 rollout 日志。
 
-第一次：手册写的是 `git clone`，拿到 HEAD，跑到一半死于
-`ModuleNotFoundError: No module named 'transfer_queue'`。
-AGENTS.md 从第一天就要求钉版本，规则写了没照做。
+### 4. 显存与残留进程
 
-第二次（更糟）：为了"修好"它去 checkout 了 v0.8.0 标签，
-`pip install -e .` 把 numpy 从 2.3.2 降到 1.26.4，
-连带 scipy、opencv、transformers 全部报错——
-**用一个只有一处导入问题的可用环境，换来了一个彻底坏掉的环境。**
-
-真正的教训不是"要钉版本"，而是：**在一个已经能跑的环境里改版本，
-本身就是一次依赖变更。** 恢复方式是回到原 commit 并显式保护依赖：
+每次失败后先检查 `nvidia-smi`。Ray/vLLM worker 可能不会随主进程退出；残留显存会让下一次运行
+报出误导性的 NCCL 或微小分配 OOM。确认没有需要保留的任务后再清理：
 
 ```bash
-cd /root/verl && git checkout 4a2cba76f7f605d2b9f56e640faaeaa71c2c7f71
-pip install --no-deps -e .
-pip install "numpy==2.3.2"
+ray stop --force
+pkill -9 -f 'ray::'
+pkill -9 -f vllm
+nvidia-smi
 ```
 
-`--no-deps` 是重点：只刷新 verl 本身，不让它重新解析并改动别的包。
+## 三步 smoke
 
-按 verl 官方 README 跑通它自带的 gsm8k GRPO 例子，再往下走。
+先用 `configs/grpo/run_smoke.sh`。目标只包括：
 
-## 第 3 步：传数据和奖励函数
+1. verl 能读取 parquet；
+2. custom reward 确实被 `reward.custom_reward_function.path/name` 加载；
+3. actor、vLLM rollout、SQL reward、反向传播和 checkpoint 能走完；
+4. rollout 日志中确实有 official/strict 字段。
 
-本地：
+smoke 跑通不代表超参数有效，只代表链路可用。
 
-```bash
-scp -P 端口号 -r data/processed/rl root@你的地址:/root/autodl-tmp/
-```
+## 正式训练
 
-```bash
-scp -P 端口号 scripts/verl_reward.py scripts/analyze_rollouts.py configs/grpo/run_grpo.sh configs/grpo/run_smoke.sh root@你的地址:/root/autodl-tmp/
-```
+当前入口是 `configs/grpo/run_grpo.sh`。最终公平实验覆盖的关键值：
 
-**还要把 `src/` 传上去。** 奖励函数不是一个独立文件，它 import 了整个包
-（执行沙箱、结果比较、SQL 解析）：
-
-```bash
-scp -P 端口号 -r src root@你的地址:/root/autodl-tmp/
-```
-
-传完在云上确认：
-
-```bash
-ls /root/autodl-tmp/src/text2sql_rlvr/
-```
-
-脚本会自己在几个位置找这个包（同级 `src/`、上一层 `src/`、以及同目录），
-都找不到时会打印它找过哪些路径。也可以用 `TEXT2SQL_SRC` 指定。
-
-奖励函数要执行 SQL，所以**这次数据库必须传**（train_databases，约 30 GB）。
-如果嫌大，也可以在云上直接下载 BIRD 训练集，比从德国上传快得多。
-
-## 第 4 步：单独测奖励函数（不启动训练）
-
-奖励函数自带一个自检入口：
-
-```bash
-cd /root/autodl-tmp && python verl_reward.py /root/autodl-tmp/bird/train/train_databases california_schools "SELECT COUNT(*) FROM schools"
-```
-
-（数据库名和 SQL 换成 train 里真实存在的）
-
-期望输出：
-
-```
-perfect                reward=1.0
-degenerate SELECT 1    reward=0.0
-not sql                reward=0.0
-write attempt          reward=0.0
-```
-
-**四行不是这个结果就停下。** 奖励错了，后面训练越久错得越离谱，而且不会报错。
-
-## 第 5 步：三步冒烟
-
-```bash
-chmod +x /root/autodl-tmp/run_grpo.sh /root/autodl-tmp/run_smoke.sh
-```
-
-```bash
-/root/autodl-tmp/run_smoke.sh
-```
-
-这一步专门用来发现配置问题。verl 的配置在版本间会变，前几次报错是正常的，
-按下表自己处理，处理不了再贴出来。
-
-| 报错 | 含义 | 处理 |
-|---|---|---|
-| `Please set at least one of 'X' or 'X_per_gpu'` | 这个键存在但默认为空，必须显式设 | 在脚本里加 `X_per_gpu=1` |
-| `Could not override 'xxx'` | 这个键在当前版本**不存在** | 去 verl 的 `trainer/config/` 里找对应新名字 |
-| `CUDA out of memory` | 显存不够 | 先看各进程占用和 requested bytes；再降 `rollout.n`、batch，启用 CPU offload，或换更大显存卡 |
-| 卡在加载模型不动 | 通常在编译或初始化 vLLM | 等几分钟；超过十分钟再看日志 |
-| `Could not append to config. An item is already at 'X'` | 用了 `+X=` 但 X 已存在 | 改用 `++X=`（覆盖）或直接 `X=` |
-| `ModuleNotFoundError` 出现在 verl 自己的文件里 | verl 该版本的某条代码路径依赖了未安装的东西 | 找配置开关绕开**整条路径**；`import` 早于配置生效，关不掉 |
-| `FlashAttention2 has been toggled on, but ... doesn't seem to be installed` | 模型的 `config.json` 里指定了 FA2 | 把 `config.json` 里的 `attn_implementation` 改成 `sdpa`，或加 `+actor_rollout_ref.model.override_config.attn_implementation=sdpa` |
-| `cumem allocator is not supported on current platform` | vLLM 的睡眠模式需要 CUDA 虚拟内存接口，容器环境不支持 | **同时**加 `++actor_rollout_ref.rollout.enable_sleep_mode=False` 和 `++actor_rollout_ref.rollout.free_cache_engine=False`；只关后者无效 |
-| `column_parallel_linear.set_lora` 中 `IndexError: tuple index out of range` | 当前 verl/vLLM 组合的 LoRA IPC 权重形状不兼容 | 加 `++actor_rollout_ref.model.lora.merge=True`，先合并 LoRA 再同步普通权重；会增加同步时峰值显存 |
-| `_merged_lora_per_tensor_param` 复制 `lm_head.weight` 时 OOM | 合并后的完整权重同步峰值超过当前卡容量 | 24 GB 上已真实发生；下一步改用单卡 48 GB 并先跑保守 smoke，不把它误判成 cuMem 或碎片问题 |
-
-### 每次崩溃之后，先清理再重试
-
-**这一条是最容易被忽略、代价却最大的。**
-
-verl 通过 Ray 启动 worker 进程。训练崩溃时，这些 worker **不一定会跟着退出**，
-而它们还占着显存。连续调试几次之后，显卡会被这些残留进程占满，
-下一次运行就会报出看起来毫不相干的错误：
-
-```
-Failed to CUDA calloc async 608 bytes
-ncclUnhandledCudaError: Call to CUDA function failed.
-```
-
-**608 字节分配失败**——不是模型太大，是显卡上一点空间都不剩了。
-这个报错指向 NCCL 和 FSDP，很容易被误判成分布式配置问题，
-实际原因只是上一次崩溃没清干净。
-
-所以：**每次报错之后、重试之前，先跑这一串。**
-
-```bash
-ray stop --force; pkill -9 -f ray::; pkill -9 -f vllm; sleep 3; nvidia-smi
-```
-
-`nvidia-smi` 里显存占用应该回到接近 0，进程列表应为空。不为空就再执行一次。
-
-判断依据很简单：**报错里的数字小得离谱（几百字节、几 KB），
-就不是"不够用"，而是"什么都不剩"。**
-
-**不要为此去装 flash-attn。** 它编译常需半小时，且对 torch / CUDA 版本敏感，
-很容易触发又一轮依赖连锁反应。`sdpa` 是 PyTorch 自带实现，
-1.7B 这个规模用它只是稍慢，精度没有差别。
-
-这一条与前面 numpy 那次是同一个原则：**能用配置解决的，不要动依赖。**
-
-**注意区分前两种。** 第一种说明键名是对的、只是没赋值，加上即可；
-第二种说明键名在这个版本里改掉了，得去源码里查。二者的处理方式完全不同。
-
-`log_prob_micro_batch_size_per_gpu` 在 `actor_rollout_ref` 下有三处
-（`actor`、`rollout`、`ref`），三处都要设，缺一处就报第一种错。
-
-跑完检查奖励日志确实产生了：
-
-```bash
-wc -l /root/autodl-tmp/out/grpo_smoke/rollouts.jsonl
-```
-
-应该有几十行，每行是一次 rollout 的完整打分记录。
-
-## 第 6 步：正式训练
-
-```bash
-/root/autodl-tmp/run_grpo.sh
-```
-
-盯三个数：
-
-| 指标 | 期望 | 异常信号 |
-|---|---|---|
-| `critic/rewards/mean` | 缓慢上升 | 暴涨到接近 1，多半是奖励算错了 |
-| `actor/entropy` | 缓慢下降 | 掉到 0.1 以下并持续，是熵坍缩，输出多样性没了 |
-| `val` 分数 | 高于 33.38% | 长期不动说明没学到东西 |
-
-**熵坍缩是这一步最典型的失败**，也正是后面消融实验要研究的现象，
-所以看到它不算灾难，记下发生在第几步。
-
-## 第 7 步：评测
-
-和 SFT 一样：先 val，再 mini-dev。检查点导出后用 vLLM 起服务，
-然后本地跑 `generate.py` 和 `evaluate.py`，`--stage grpo`。
-
-## 第 8 步：反作弊实验（这是这个项目最值钱的部分）
-
-在同样的配置下，**只改一个环境变量**再训一次：
-
-```bash
-TEXT2SQL_REWARD_EXEC=0.3 EXP=grpo_naive OUT=/root/autodl-tmp/out/grpo_naive /root/autodl-tmp/run_grpo.sh
-```
-
-这是给"SQL 能跑就给 0.3 分"。然后对比两次的 `rollouts.jsonl`：
-
-```bash
-python scripts/analyze_rollouts.py --rollouts /path/to/rollouts.jsonl
-```
-
-要看的是 `no_from_rate`（输出 `SELECT 1` 这种不读库的查询的比例）
-和 `hack_rate`（拿到奖励但严格口径判错的比例）随训练步数怎么变。
-
-**如果朴素奖励下这两个数明显上升、严格奖励下不上升，你就有了一个完整的、
-自己造出来又自己测出来的 reward hacking 案例。** 这比引用别人论文里的现象值钱得多。
-
----
-
-## 成本预估
-
-| | 估算 |
+| 参数 | 值 |
 |---|---|
-| 一步 GRPO（32 题 × 8 个答案 = 256 次生成 + 256 次 SQL 执行） | 30–90 秒 |
-| 300 步 | 3–7 小时 |
-| 两次训练（严格 + 朴素） | 6–14 小时，一百多块 |
+| 起点 | 强 SFT 合并模型 |
+| schema | linked |
+| train prompt | 固定 500，seed=0 |
+| val | 固定 200，与 train 不重叠 |
+| rollout n | 4 |
+| train batch | 32 |
+| LoRA | rank 32 / alpha 64 / all-linear |
+| actor lr | 1e-6 |
+| steps | 30 |
+| save / test | 每 10 step |
+| thinking | false |
+| max prompt / response | 8192 / 512 |
+| Dynamic Sampling | 未使用 |
 
-**这些是估算，没有实测。** 前面 SFT 我估 2–4 小时实际 30 分钟，估算就是估算。
-冒烟跑完看一步实际多久，再决定跑多少步。
+示例：
 
-## 可信度
+```bash
+MODEL=/root/autodl-tmp/Qwen3-1.7B-sft-strong-merged-f78ab16a \
+DATA=/root/autodl-tmp/rl-linked \
+OUT=/root/autodl-tmp/out/grpo-linked-official \
+EXP=grpo-linked-official \
+TOTAL_STEPS=30 \
+bash configs/grpo/run_grpo.sh
+```
 
-| 步骤 | 依据 |
-|---|---|
-| 奖励函数本身 | **30+ 条单元测试，本地全绿** |
-| 训练数据格式 | 本地生成并读回验证 |
-| `max_prompt_length=8192` | **实测**：1288 次真实生成中最长 6731 token |
-| verl 配置与初始化 | 在锁定 commit 上已走到首次权重同步；不是完整训练验证 |
-| 单卡 24 GB 显存 | 当前“关闭睡眠 + 合并 LoRA 同步”路径在首次权重同步时已确认 OOM |
-| 单卡 48 GB 显存 | **未验证**；下一次 smoke 的目标环境 |
-| 超参数 | 有依据的起点，非实测最优 |
+运行开始后，从 resolved config 核对以下项目，不要只相信 shell 参数：
+
+- `enable_thinking=False`；
+- `tensor_model_parallel_size=1`；
+- `rollout.n=4`；
+- custom reward 路径和函数名；
+- train/val parquet 的实际路径；
+- `TEXT2SQL_REWARD_OFFICIAL=1`；
+- 输出目录没有复用旧实验。
+
+## 训练时看什么
+
+| 信号 | 正常含义 | 异常解释 |
+|---|---|---|
+| `critic/rewards/mean` | 当前 batch 的 rollout 正确率 | 不能单独证明泛化 |
+| `actor/entropy` | 输出分布仍有探索 | 持续接近 0 才怀疑 collapse |
+| prompt/response clip ratio | 应为 0 | 非 0 说明长度配置破坏实验 |
+| aborted ratio | 应接近 0 | 生成或服务不稳定 |
+| val official | checkpoint 选择依据 | 只能在固定 val 上比较 |
+| group reward variance | 有效 GRPO 信号 | 全 0/全 1 group 不提供相对排序 |
+
+最终 run 没有发生 prompt 截断、响应中止或 entropy collapse；但 val 在 step 10 后没有继续改善。
+
+## checkpoint 选择与导出
+
+最终 run 的 step 10/20/30 在固定 val 200 上并列，按预先规则选最早的 step 10。不能在完整
+val 788 上重新挑 checkpoint。
+
+verl 0.9 保存的是带 PEFT LoRA 参数的 `.pt` state dict，不是可直接给 vLLM 的 Hugging Face 目录。
+必须用真实 GRPO 起点模型重建 LoRA，然后精确检查 missing/unexpected keys，再 merge：
+
+```bash
+python scripts/convert_checkpoint.py \
+  --ckpt /root/autodl-tmp/out/grpo-linked-official/global_step_10/actor \
+  --base /root/autodl-tmp/Qwen3-1.7B-sft-strong-merged-f78ab16a \
+  --out /root/autodl-tmp/Qwen3-1.7B-grpo-linked-step10
+```
+
+如果报 `No space left on device`，先删失败留下的半截输出和明确可重建的旧合并模型；不要删除原始
+verl checkpoint 或唯一的 SFT 起点。最终实验第一次后处理失败就是数据盘写满，不是权重损坏。
+
+## 确定性评测
+
+Blackwell 上启动 vLLM：
+
+```bash
+VLLM_USE_FLASHINFER_SAMPLER=0 \
+VLLM_ATTENTION_BACKEND=TRITON_ATTN \
+vllm serve /root/autodl-tmp/Qwen3-1.7B-grpo-linked-step10 \
+  --served-model-name text2sql-grpo \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --dtype bfloat16 \
+  --max-model-len 8704 \
+  --gpu-memory-utilization 0.85 \
+  --enforce-eager \
+  --trust-remote-code
+```
+
+生成与评测：
+
+```bash
+python scripts/generate.py \
+  --root /root/autodl-tmp \
+  --questions /path/to/fixed_val788.json \
+  --split train \
+  --schema-mode linked \
+  --model text2sql-grpo \
+  --temperature 0 \
+  --top-p 1 \
+  --seed 0 \
+  --max-tokens 512 \
+  --out /path/to/grpo-linked.jsonl
+
+python scripts/evaluate.py \
+  --root /root/autodl-tmp \
+  --questions /path/to/fixed_val788.json \
+  --split train \
+  --predictions /path/to/grpo-linked.jsonl \
+  --stage grpo \
+  --checkpoint /root/autodl-tmp/Qwen3-1.7B-grpo-linked-step10 \
+  --config-path configs/grpo/run_grpo.sh \
+  --outcomes /path/to/grpo-linked-outcomes.jsonl
+```
+
+评测前要求仓库干净。`evaluate.py` 会自动记录 Git SHA、dirty state、配置哈希、解码参数和结果。
+
+## 当前不建议继续做什么
+
+- 不直接增加训练步数；
+- 不先上 Dynamic Sampling；
+- 不用完整 val 788 反复挑 checkpoint；
+- 不读取 BIRD dev 来美化结果；
+- 不运行未设计清楚的 execution bonus 对照；
+- 不为了修一个配置问题升级整套依赖。
+
+如果以后继续，第一步应离线统计 group reward variance。只有确认大量 group 为全 0/全 1，才有
+证据支持 Dynamic Sampling 或增加 rollout n；否则先查更新量与 train/val 泛化差异。
+
+## 云端最终产物
+
+完整路径、磁盘状态和保留/清理建议见仓库根目录 `HANDOFF.md`。实验结束后 vLLM 和训练进程都已
+退出；AutoDL 按开机时间计费，确认产物写完后应立即关机。

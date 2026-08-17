@@ -1,5 +1,8 @@
 # 第一次上 GPU：跑出 baseline 分数
 
+> 最终状态（2026-08-17）：baseline 路径已经跑通。本文件是第一次 baseline 的历史操作手册，
+> 不是当前 GRPO 环境说明；最终训练环境见 `requirements-train.txt` 和 `docs/grpo-runbook.md`。
+
 目标：让 Qwen3-1.7B 在完全没训练的情况下做完 mini-dev 的 500 道题，得到项目的第一个真实数字。
 
 ## 整体思路：GPU 上只跑模型，别的都留在本地

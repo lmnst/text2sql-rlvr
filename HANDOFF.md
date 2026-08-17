@@ -1,88 +1,108 @@
-# 项目交接（2026-08-16 晚更新）
+# 项目最终交接（2026-08-17）
 
-## 先读什么
+## 一句话状态
 
-1. `AGENTS.md`：数据划分、实验记录和真实性规则（不可违反）。
-2. `docs/PROGRESS.md`：全部里程碑历史；里程碑 15 的结论已在文末追加订正。
-3. `docs/resume-draft.md`：简历草稿，GRPO 真实数字已填。
-4. `requirements-train.txt`：训练环境钉死的版本组合 + 6 条 Blackwell workaround。
-5. `results/runs.jsonl`：可对外引用的实验台账（含 GRPO val 一行，run_id=a8f7fa3bdecc）。
+项目已经收尾：BIRD 数据、只读 SQL 执行、官方/严格双评测、Qwen3-1.7B baseline、LoRA SFT、
+linked schema、verl GRPO、checkpoint 导出和完整 val 评测全部跑通。确定性成果是 schema linking；
+本次普通 GRPO 基本持平，不能写成有效提升。
 
-## 当前状态（最重要的一段）
+## 可对外引用的结果
 
-**主线：先验证 schema linking，再公平重跑 official-reward GRPO。**
+| 阶段 | 划分 | n | official EX | strict EX | run_id |
+|---|---|---:|---:|---:|---|
+| Qwen3-1.7B baseline | Mini-Dev | 500 | 19.80% | 17.40% | `43bb66bbe1e8` |
+| LoRA SFT | Mini-Dev | 500 | 34.60% | 30.00% | `f1ef9b247255` |
+| 强 SFT + full schema | 固定 train-val | 788 | 32.87% | 28.68% | `74d4d83c087c` |
+| 强 SFT + linked schema | 固定 train-val | 788 | 37.94% | 33.63% | `3b9e91f891d8` |
+| official-reward GRPO + linked schema | 固定 train-val | 788 | 38.20% | 33.88% | `53d1586c7d33` |
 
-| 阶段 | val 788 题 official | val 788 题 strict | mini-dev 500 题 official |
-|---|---|---|---|
-| 基线 | 21.83% | 19.54% | 19.80% |
-| 强 SFT（checkpoint 已恢复） | 33.38% | 29.06% | 34.60% |
-| 新 SFT（GRPO 的真实起点，诊断评测） | 29.19% | 25.76% | 未评测 |
-| 旧 GRPO（150 步，诊断评测） | 29.70% | 25.76% | 未评测 |
-| corrected GRPO step 10（诊断评测） | 29.31% | 25.63% | 未评测 |
+公平配对结论：
 
-- 旧 GRPO 实际从 2026-08-16 重训的新 SFT 出发；33.38% 的 SFT 数字来自已丢失的旧 checkpoint，
-  不能作为直接对照。诊断结果显示旧 GRPO 相对真实起点为 official +0.51、strict +0.00 个点。
-- `grpo_train2.log` 的 `data.apply_chat_template_kwargs={}`，训练误用了 Qwen3 thinking；最终评测却关闭 thinking。
-- corrected run 显式关闭 thinking，val 200 条用 seed=0 随机抽样并覆盖 3 个数据库。step 0→10
-  的 strict reward 为 0.265→0.260、official 为 0.320→0.310，因此在第一个 checkpoint 止损。
-- step 10 完整 val 788 题相对直接 SFT 是 official +0.12、strict -0.13 个百分点，本质无变化。
-- 上述新 SFT 诊断数字尚未写入正式台账，因此不能用于简历或 README。
-- 原强 SFT adapter 已恢复并按 SHA-256 校验，合并模型位于 F37 数据盘
-  `/root/autodl-tmp/Qwen3-1.7B-sft-strong-merged-f78ab16a`。
-- 同一强 SFT、固定 val 200 的 schema 诊断中，linked 相对 full 的 official 为
-  39.5% 对 33.0%，strict 为 34.0% 对 27.0%；这些是 dirty 诊断结果，尚不能对外报告。
+- linked 相对 full：official gain 76、loss 36，净增 40/788，即 +5.07 个百分点；
+- GRPO 相对 linked SFT：official gain 12、loss 10，净增 2/788，即 +0.26 个百分点；
+- 后者按“没有明确额外收益”处理，不声称 GRPO 有效涨分；
+- BIRD dev 没有用于训练、调参、early stopping 或 checkpoint 选择，尚无 dev 成绩。
 
-**已完成链路**（全部有证据）：
+每个表格数字都能在 `results/runs.jsonl` 里按 run_id 唯一定位。详细解释见
+`docs/FINAL_REPORT.md`，完整历史见 `docs/PROGRESS.md`。
 
-| 环节 | 状态 |
-|---|---|
-| BIRD 数据/评测/只读 SQL 沙箱/双验证器 | ✅ 长期完成 |
-| Qwen3-1.7B 基线 | ✅ mini-dev 官方 EX 19.80% |
-| LoRA SFT 1 epoch | ⚠️ 旧 checkpoint 为 34.60%；新脚本重训结果未复现，正在排查 |
-| GRPO 三步 smoke | ✅ 3 step 跑通，rollouts.jsonl 212 行 |
-| 正式 GRPO 训练（150 步） | ⚠️ 完成，但模板不一致且直接 SFT 对照缺失，结论作废 |
-| checkpoint 导出 | ✅ 实测通过（missing=0/unexpected=0），`scripts/convert_checkpoint.py` 或手工 peft 合并 |
-| vLLM 起服务 | ✅ 需 `VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_ATTENTION_BACKEND=TRITON_ATTN --enforce-eager` |
-| 对照实验（exec bonus） | ⬜ **未跑（建议下一步第一优先）** |
-| mini-dev 最终评测 | ⬜ 未跑（val 已降，mini-dev 大概率同样低于 SFT，但按纪律未验证） |
-| 错误分析 | ⬜ 未做（正式训练 rollouts.jsonl 22024 条可支撑） |
+## 本地仓库
 
-## 云上环境（AutoDL，勿轻易动）
+- 当前分支：`main`。
+- 最终实验记录提交：`e945064`；本次文档收尾会再产生一个提交。
+- 本地完整测试：222 passed；pytest 因工作区权限无法写 `.pytest_cache`，不影响测试结果。
+- 本地分支领先 `origin/main`，尚未 push；push 需要 GitHub 凭证或用户授权。
+- `.pt2/` 和 `.pytest_tmp/` 是无法读取的忽略目录，Git 会打印 permission warning，tracked
+  worktree 不受影响。
 
-- 机器：单卡 RTX 6000D 84GB（Blackwell sm_120）。**关机安全（数据保留），释放/保存镜像会丢数据盘。**
-- 版本组合（钉死，见 `requirements-train.txt`）：torch 2.11.0+cu130、vLLM 0.24.0、
-  verl commit `4a2cba76`（0.9.0.dev0，源码在 `/root/verl`）、transformers 5.5.3。
-- 数据盘 `/root/autodl-tmp/` 关键内容：
-  - `Qwen3-1.7B/`（基座）、`Qwen3-1.7B-sft-merged/`（SFT 合并）、`Qwen3-1.7B-grpo/`（GRPO 导出）
-  - `train/`（BIRD train：train.json + train_databases/ 69 库）
-  - `rl/`（parquet）、`src/`、`verl_reward.py`、`run_grpo.sh` / `run_smoke.sh`
-  - `out/grpo/`（正式训练：checkpoints global_step_50/100/150 + rollouts.jsonl 22024 条）
-  - `grpo_train.log`（第一次白跑）、`grpo_train2.log`（有效训练日志）
+## 云端 F37 状态
 
-**云上对第三方源码的手改（换机器必须重做，方法见 requirements-train.txt）**：
-1. `torch/_inductor/select_algorithm.py`：注释两行 assert（PyTorch #186220）。
-2. `verl/utils/attention_utils.py`：flash_attn.bert_padding → transformers + einops 回退。
-3. `run_grpo.sh` 的奖励键名 `reward.custom_reward_function.*` 等配置修正。
+评测结束时后处理状态为 `COMPLETE`，`nvidia-smi` 没有计算进程。实例可以直接关机止费；
+关机保留数据，释放实例或制作不含数据盘的镜像可能丢失 `/root/autodl-tmp`。
 
-## 本地仓库状态
+关键产物：
 
-- `main` 领先 `origin/main` 9+ 个 commit。**待 push**（需要 GitHub 凭证）。
-- 台账 `results/runs.jsonl` 已清理无效记录（0.00% 那条空评测已删），现为 7 行有效记录。
+```text
+/root/autodl-tmp/Qwen3-1.7B-sft-strong-merged-f78ab16a
+    最终公平对照使用的强 SFT 起点
 
-## 下一步（建议顺序）
+/root/autodl-tmp/schema-val788-c9cf559/
+    full / linked 的 788 题预测、逐题 outcomes 和评测日志
 
-1. 在干净 commit 上完成强 SFT 的 full / linked 完整 val 788 配对评测，确认 200 题提升能否复现。
-2. linked 静态诊断同时报告逐题 gold 表全保留率、外键连通保留率和干扰表数量；不要只报平均表召回。
-3. 若 linked 提升稳定，用 linked schema 和 BIRD official 主奖励重跑普通 GRPO；strict 仅作监控指标。
-4. 固定相同 val、解码和 checkpoint 对照，先不做 Dynamic Sampling 或大规模数据清洗。
+/root/autodl-tmp/out/grpo-linked-official-b1d7bdb-n500/
+    最终普通 GRPO 的原始 verl checkpoints 和训练产物
 
-## 换电脑恢复
+/root/autodl-tmp/Qwen3-1.7B-grpo-b1-best-c1f62a1/
+    选中的 step 10 LoRA checkpoint 合并后的 Hugging Face 模型
 
-```bash
-git clone https://github.com/lmnst/text2sql-rlvr.git
-cd text2sql-rlvr
-pip install -r requirements-dev.txt
-python -m pytest          # 本地测试应全绿（数据不依赖 BIRD）
+/root/autodl-tmp/grpo-val788-c1f62a1/
+    GRPO 的 788 题预测、outcomes、评测日志和 paired 对比
+
+/root/grpo_linked_official_b1d7bdb_train.log
+    最终训练日志
+
+/root/paired_sft_vs_grpo_c1f62a1.json
+    SFT 与 GRPO 的逐题配对汇总
 ```
 
-BIRD 数据按 `docs/data.md` 重下；GPU 环境按 `requirements-train.txt` + 本文件「云上环境」一节重建。
+数据盘约 150 GB，收尾时只剩约 1.4 GB。不要在未清理前再导出模型。优先删除可以重建的旧
+合并模型和作废实验 checkpoint；必须保留上面列出的强 SFT、最终 GRPO 原始 checkpoint、最终
+合并模型、三组 outcomes 和日志。曾删除的只有一个可重建的 step 10 转换器测试模型，没有删除
+训练 checkpoint。
+
+## 最终 GRPO 配置
+
+- 起点：强 SFT 合并模型；
+- 数据：BIRD train 固定 500 prompt，seed=0，与固定 val 200 不重叠；
+- schema：linked；
+- 主奖励：BIRD official EX；strict 只作监控；
+- 普通 GRPO，LoRA rank 32 / alpha 64，rollout n=4，30 step；
+- thinking 关闭，max prompt 8192，max response 512；
+- step 10/20/30 在 val 200 上均为 40.0%，按预设规则取并列中最早的 step 10；
+- 不使用 Dynamic Sampling，也没有做大规模数据清洗。
+
+训练代码提交为 `b1d7bdb`，checkpoint 转换与最终评测代码提交为 `c1f62a1`。verl 0.9 的
+`.pt` LoRA checkpoint 已实测可以精确重建 PEFT 权重并合并成标准 Hugging Face 模型。
+
+## 如果以后继续实验
+
+现在不建议继续烧 GPU。先离线统计最终 rollout 中每个 prompt group 的 reward 组成：全 0、全 1、
+有 0 有 1分别占多少。只有 mixed group 才会给普通 GRPO 提供组内相对优势。
+
+判断顺序：
+
+1. mixed group 很少：优先改善探索、模型能力或采样策略，再考虑 Dynamic Sampling；
+2. mixed group 足够但 train/val 都不涨：检查学习率、LoRA 更新量和 reward 接入；
+3. train 涨而 val 不涨：按过拟合或 official reward 偶然命中分析；
+4. 没有新的诊断证据前，不重跑更长 GRPO，也不读取 BIRD dev。
+
+## 写简历时
+
+直接使用 `docs/resume-draft.md` 的推荐三条。核心叙事是：
+
+1. 做成了可复现的执行反馈 RLVR 全链路；
+2. 通过受控实验发现主要瓶颈是无关 schema 干扰，official EX 从 32.87% 提升至 37.94%；
+3. 修正 reward 和 prompt 后，普通 GRPO 为 38.20%，因此诚实报告为无明确增益。
+
+不要写“GRPO 显著提升”“BIRD dev 38.20%”“解决了 schema linking”或未运行的 reward-hacking
+对照实验。
