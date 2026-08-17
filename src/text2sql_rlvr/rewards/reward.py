@@ -1,14 +1,10 @@
 """The reward signal for GRPO.
 
-Design follows from what was measured, not from what sounded good:
-
-**The strict verifier is the reward, not BIRD's official one.** Milestone 9 found
-25 of 500 SFT answers that the official set comparison credits and the strict one
-rejects, and every one is the same shape: gold says ``SELECT DISTINCT`` and the
-model omits it, returning 933 rows where 21 were wanted. Under the official
-metric those score identically, so a policy trained on it faces no pressure to
-ever deduplicate. Reinforcement learning amplifies whatever it is not pushed
-against.
+The primary reward follows BIRD official Execution Accuracy because that is the
+headline metric used to select and report the model. The strict verifier is
+still computed for every rollout. In particular, ``official=True`` together
+with ``correct=False`` exposes duplicate-row cases that BIRD's set comparison
+credits, so metric exploitation remains measurable instead of being hidden.
 
 **Partial credit is off by default.** ``execution_bonus`` pays out for SQL that
 merely runs, which ``SELECT 1`` satisfies without reading the database. That is
@@ -35,7 +31,7 @@ from text2sql_rlvr.sql import extract_sql, has_from_clause, validate_read_only
 class RewardConfig:
     """What the policy is paid for.
 
-    Defaults are the honest setting: correctness only, judged strictly.
+    Defaults are correctness only, judged by BIRD official Execution Accuracy.
     """
 
     correct: float = 1.0
@@ -46,8 +42,8 @@ class RewardConfig:
     #: This is the deliberate hack lever.
     execution_bonus: float = 0.0
     #: Score against BIRD's set comparison instead of the strict verifier.
-    #: Only for the ablation that shows why we do not.
-    use_official: bool = False
+    #: Keep enabled for the main run; strict remains available as an ablation.
+    use_official: bool = True
     order_policy: str = DEFAULT_ORDER_POLICY
 
     def as_dict(self) -> dict[str, object]:
@@ -191,8 +187,8 @@ class RewardStats:
             "mean_reward": round(self.total_reward / self.n, 4),
             "strict_acc": round(self.n_correct / self.n, 4),
             "official_acc": round(self.n_official / self.n, 4),
-            # The gap the whole project is about. If this grows during training,
-            # the policy is learning to satisfy the loose metric.
+            # If this grows while official reward rises, inspect duplicate-row
+            # outputs before claiming improved Text-to-SQL ability.
             "official_minus_strict": round((self.n_official - self.n_correct) / self.n, 4),
             "parse_rate": round(self.n_parsed / self.n, 4),
             "exec_rate": round(self.n_executed / self.n, 4),

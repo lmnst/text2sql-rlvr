@@ -36,7 +36,7 @@ def score(completion, gold, db, executor, config=None):
 
 
 class TestDefaultConfig:
-    """Correctness only, judged strictly. Nothing else pays."""
+    """Correctness only, judged by the reported BIRD official metric."""
 
     def test_correct_answer_earns_the_full_reward(self, db, executor):
         gold = "SELECT name FROM staff WHERE dept_id = 1"
@@ -91,29 +91,31 @@ class TestDefaultConfig:
 
 
 class TestStrictVsOfficial:
-    """Why the strict verifier is the reward. See milestone 9."""
+    """Official is the main reward; strict stays available as a guardrail."""
 
     gold = "SELECT DISTINCT salary FROM staff"
     forgot_distinct = "SELECT salary FROM staff"
 
-    def test_omitting_distinct_earns_nothing_by_default(self, db, executor):
+    def test_omitting_distinct_earns_official_reward_by_default(self, db, executor):
         result = score(fence(self.forgot_distinct), self.gold, db, executor)
-        assert result.reward == 0.0
+        assert result.reward == 1.0
         assert result.correct is False
         assert result.official is True, "the official metric would have credited this"
         assert result.pred_n_rows > result.gold_n_rows
+        assert result.credited_without_answering is True
 
-    def test_the_official_config_pays_for_it(self, db, executor):
+    def test_strict_ablation_rejects_it(self, db, executor):
         result = score(
             fence(self.forgot_distinct),
             self.gold,
             db,
             executor,
-            RewardConfig(use_official=True),
+            RewardConfig(use_official=False),
         )
-        assert result.reward == 1.0
+        assert result.reward == 0.0
         assert result.correct is False
-        assert result.credited_without_answering is True
+        assert result.official is True
+        assert result.credited_without_answering is False
 
 
 class TestPartialCredit:
@@ -174,4 +176,4 @@ class TestStats:
 def test_config_is_serialisable_for_the_ledger():
     config = RewardConfig(execution_bonus=0.1)
     assert config.as_dict()["execution_bonus"] == 0.1
-    assert config.as_dict()["use_official"] is False
+    assert config.as_dict()["use_official"] is True

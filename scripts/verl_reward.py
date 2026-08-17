@@ -12,7 +12,7 @@ that would have to be remembered and undone:
     TEXT2SQL_DB_ROOT          required, the *_databases directory
     TEXT2SQL_REWARD_FORMAT    format bonus, default 0
     TEXT2SQL_REWARD_EXEC      bonus for SQL that merely runs, default 0
-    TEXT2SQL_REWARD_OFFICIAL  "1" to score with BIRD's set comparison
+    TEXT2SQL_REWARD_OFFICIAL  "1" to score with BIRD's set comparison (default)
     TEXT2SQL_REWARD_TIMEOUT   seconds, default 10
     TEXT2SQL_ROLLOUT_LOG      jsonl path; every rollout's breakdown is appended
 
@@ -76,7 +76,7 @@ def _flag(name: str, default: str = "0") -> bool:
 _CONFIG = RewardConfig(
     format_bonus=float(os.environ.get("TEXT2SQL_REWARD_FORMAT", "0")),
     execution_bonus=float(os.environ.get("TEXT2SQL_REWARD_EXEC", "0")),
-    use_official=_flag("TEXT2SQL_REWARD_OFFICIAL"),
+    use_official=_flag("TEXT2SQL_REWARD_OFFICIAL", "1"),
     order_policy=os.environ.get("TEXT2SQL_ORDER_POLICY", "ignore"),
 )
 
@@ -141,6 +141,8 @@ def compute_score(
     payload = breakdown.as_dict()
     payload["question_id"] = (extra_info or {}).get("question_id")
     payload["db_id"] = (extra_info or {}).get("db_id")
+    payload["split"] = (extra_info or {}).get("split")
+    payload["sample_index"] = (extra_info or {}).get("index")
     payload["data_source"] = data_source
     _record(payload)
 

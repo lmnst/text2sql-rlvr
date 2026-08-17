@@ -3,25 +3,34 @@
 ## 先读什么
 
 1. `AGENTS.md`：数据划分、实验记录和真实性规则（不可违反）。
-2. `docs/PROGRESS.md`：全部里程碑历史，最新到「里程碑 15：正式 GRPO 完成，未超过 SFT」。
+2. `docs/PROGRESS.md`：全部里程碑历史；里程碑 15 的结论已在文末追加订正。
 3. `docs/resume-draft.md`：简历草稿，GRPO 真实数字已填。
 4. `requirements-train.txt`：训练环境钉死的版本组合 + 6 条 Blackwell workaround。
 5. `results/runs.jsonl`：可对外引用的实验台账（含 GRPO val 一行，run_id=a8f7fa3bdecc）。
 
 ## 当前状态（最重要的一段）
 
-**主线：正式 GRPO 训练已完成，结果为负（诚实记录，不是失败）。**
+**主线：先验证 schema linking，再公平重跑 official-reward GRPO。**
 
 | 阶段 | val 788 题 official | val 788 题 strict | mini-dev 500 题 official |
 |---|---|---|---|
 | 基线 | 21.83% | 19.54% | 19.80% |
-| SFT 后 | 33.38% | 29.06% | 34.60% |
-| GRPO 后（150 步、n=4、严格奖励） | **29.70%** | **25.76%** | 未评测 |
+| 强 SFT（checkpoint 已恢复） | 33.38% | 29.06% | 34.60% |
+| 新 SFT（GRPO 的真实起点，诊断评测） | 29.19% | 25.76% | 未评测 |
+| 旧 GRPO（150 步，诊断评测） | 29.70% | 25.76% | 未评测 |
+| corrected GRPO step 10（诊断评测） | 29.31% | 25.63% | 未评测 |
 
-- 训练集 reward 从 0.20 涨到 0.375（持续上升），训练中 val 子集横盘 0.235–0.245。
-- 结论：**GRPO 未超过 SFT**。训练 reward 上升、验证准确率不涨，是 RLVR 教科书级现象
-  （模型学到刷分技巧而非可迁移的查询能力）。这个负结果 + 接下来的对照实验构成完整诚实叙事。
-- 台账依据：GRPO val 在 `results/runs.jsonl`（run_id=a8f7fa3bdecc，官方 29.70/严格 25.76）。
+- 旧 GRPO 实际从 2026-08-16 重训的新 SFT 出发；33.38% 的 SFT 数字来自已丢失的旧 checkpoint，
+  不能作为直接对照。诊断结果显示旧 GRPO 相对真实起点为 official +0.51、strict +0.00 个点。
+- `grpo_train2.log` 的 `data.apply_chat_template_kwargs={}`，训练误用了 Qwen3 thinking；最终评测却关闭 thinking。
+- corrected run 显式关闭 thinking，val 200 条用 seed=0 随机抽样并覆盖 3 个数据库。step 0→10
+  的 strict reward 为 0.265→0.260、official 为 0.320→0.310，因此在第一个 checkpoint 止损。
+- step 10 完整 val 788 题相对直接 SFT 是 official +0.12、strict -0.13 个百分点，本质无变化。
+- 上述新 SFT 诊断数字尚未写入正式台账，因此不能用于简历或 README。
+- 原强 SFT adapter 已恢复并按 SHA-256 校验，合并模型位于 F37 数据盘
+  `/root/autodl-tmp/Qwen3-1.7B-sft-strong-merged-f78ab16a`。
+- 同一强 SFT、固定 val 200 的 schema 诊断中，linked 相对 full 的 official 为
+  39.5% 对 33.0%，strict 为 34.0% 对 27.0%；这些是 dirty 诊断结果，尚不能对外报告。
 
 **已完成链路**（全部有证据）：
 
@@ -29,9 +38,9 @@
 |---|---|
 | BIRD 数据/评测/只读 SQL 沙箱/双验证器 | ✅ 长期完成 |
 | Qwen3-1.7B 基线 | ✅ mini-dev 官方 EX 19.80% |
-| LoRA SFT 1 epoch | ✅ mini-dev 官方 EX 34.60%；`scripts/train_sft.py` 可重训复现 |
+| LoRA SFT 1 epoch | ⚠️ 旧 checkpoint 为 34.60%；新脚本重训结果未复现，正在排查 |
 | GRPO 三步 smoke | ✅ 3 step 跑通，rollouts.jsonl 212 行 |
-| 正式 GRPO 训练（150 步） | ✅ 完成，val 29.70%（低于 SFT） |
+| 正式 GRPO 训练（150 步） | ⚠️ 完成，但模板不一致且直接 SFT 对照缺失，结论作废 |
 | checkpoint 导出 | ✅ 实测通过（missing=0/unexpected=0），`scripts/convert_checkpoint.py` 或手工 peft 合并 |
 | vLLM 起服务 | ✅ 需 `VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_ATTENTION_BACKEND=TRITON_ATTN --enforce-eager` |
 | 对照实验（exec bonus） | ⬜ **未跑（建议下一步第一优先）** |
@@ -62,15 +71,10 @@
 
 ## 下一步（建议顺序）
 
-1. **对照实验（第一优先，最值钱的素材）**：
-   `TEXT2SQL_REWARD_EXEC=0.3 OUT=/root/autodl-tmp/out/grpo_naive /root/autodl-tmp/run_grpo.sh`
-   再训一次（约 4 小时），然后
-   `python scripts/analyze_rollouts.py --rollouts /root/autodl-tmp/out/grpo_naive/rollouts.jsonl`
-   对比严格版与 naive 版的 no_from / hack 率。**这个实验不依赖 GRPO 提升，大概率有戏剧性结果。**
-2. **mini-dev 评测**（可选但建议做，让表格完整）：vLLM serve GRPO 模型 → 本地
-   generate/evaluate（`--split mini_dev --stage grpo`）。预期低于 34.60%，如实记录。
-3. **错误分析**：对比 SFT 与 GRPO 的 outcomes（`results/outcomes/`），写进 PROGRESS。
-4. **收尾**：README Status 更新 → PROGRESS 里程碑 16 → push 全部。
+1. 在干净 commit 上完成强 SFT 的 full / linked 完整 val 788 配对评测，确认 200 题提升能否复现。
+2. linked 静态诊断同时报告逐题 gold 表全保留率、外键连通保留率和干扰表数量；不要只报平均表召回。
+3. 若 linked 提升稳定，用 linked schema 和 BIRD official 主奖励重跑普通 GRPO；strict 仅作监控指标。
+4. 固定相同 val、解码和 checkpoint 对照，先不做 Dynamic Sampling 或大规模数据清洗。
 
 ## 换电脑恢复
 

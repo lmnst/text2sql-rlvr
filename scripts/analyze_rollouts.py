@@ -34,18 +34,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="split the run into this many equal slices, in order")
     parser.add_argument("--examples", type=int, default=3,
                         help="degenerate completions to print from the final slice")
+    parser.add_argument("--split", choices=("train", "val"), default=None,
+                        help="analyse only this split (requires newly tagged rollout logs)")
     return parser.parse_args(argv)
 
 
-def load(path: Path) -> list[dict]:
+def load(path: Path) -> tuple[list[dict], int]:
     rows = []
+    errors = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         record = json.loads(line)
-        if "error" not in record:
-            rows.append(record)
-    return rows
+        if "error" in record:
+            errors += 1
+            continue
+        rows.append(record)
+    return rows, errors
 
 
 def summarise(rows: list[dict]) -> dict[str, float]:
@@ -66,12 +71,14 @@ def summarise(rows: list[dict]) -> dict[str, float]:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    rows = load(args.rollouts)
+    rows, errors = load(args.rollouts)
+    if args.split:
+        rows = [row for row in rows if row.get("split") == args.split]
     if not rows:
-        print(f"no usable rollouts in {args.rollouts}")
+        print(f"no usable rollouts in {args.rollouts} ({errors} error records)")
         return 1
 
-    print(f"{len(rows)} rollouts from {args.rollouts}\n")
+    print(f"{len(rows)} usable rollouts, {errors} error records from {args.rollouts}\n")
     header = f"{'slice':>7}{'n':>8}{'reward':>9}{'strict':>9}{'official':>10}"
     header += f"{'exec':>8}{'no_from':>9}{'empty':>8}{'hack':>8}"
     print(header)

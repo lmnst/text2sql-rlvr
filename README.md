@@ -86,10 +86,11 @@ results/                      runs.jsonl is tracked; everything else is ignored
 
 ## Remaining plan
 
-1. Pass the three-step GRPO smoke test on the pinned AutoDL environment.
-2. Run GRPO with the strict verifier as reward and evaluate on validation before Mini-Dev.
-3. Run the matched naive-reward control with execution partial credit.
-4. Compare rollout hack rates, then decide which ablations and error analyses are justified.
+1. On the fixed validation subset, compare full, linked and oracle schemas with deterministic decoding.
+2. Use BIRD official Execution Accuracy as the main GRPO reward; keep strict equivalence and hack rate
+   as monitoring metrics.
+3. Rebuild RL data with the best non-oracle schema strategy and run a clean 200--500-prompt GRPO job.
+4. Only add dynamic sampling if too many prompt groups still have zero reward variance.
 
 The operational continuation point is in `HANDOFF.md`. Conventions, data-split discipline and
 reporting rules are in `AGENTS.md`.

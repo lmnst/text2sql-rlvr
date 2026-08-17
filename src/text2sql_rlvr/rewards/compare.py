@@ -5,12 +5,11 @@ on the raw tuples. It is the number that goes in any table that claims to report
 Execution Accuracy, and it must not be quietly "improved".
 
 ``strict`` is our own verifier: same column count, same rows *with multiplicity*,
-numeric values compared after canonicalisation. It is what the RL reward should
-use, because the official set comparison is trivially satisfiable in ways that
-have nothing to do with answering the question.
+numeric values compared after canonicalisation. It is retained as a guardrail
+metric because the official set comparison can credit duplicate-heavy results.
 
-Keeping both and recording where they disagree is the point. That gap is the
-measurement, not a nuisance.
+Keeping both and recording where they disagree lets the main reward match the
+reported metric without losing sight of reward hacking.
 """
 
 from __future__ import annotations

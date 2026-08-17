@@ -933,3 +933,171 @@ dict 导致 SFT 训练 collate 报错，改为 tokenize=False + 手动 encode。
   但 vLLM 起服务时踩了 SM120 上 FlashInfer 采样器的 bug（vLLM 官方后续版本才默认禁用的
   PR #44405），最终用 `VLLM_USE_FLASHINFER_SAMPLER=0 + TRITON_ATTN + enforce-eager` 起服务成功。
   这条已记入 requirements-train.txt 的 workaround 清单。
+
+---
+
+## 2026-08-17 · 里程碑 16：订正 GRPO 对比结论，修复训练模板与验证子集
+
+### 做了什么
+
+重新核对云端产物后，确认里程碑 15 的“GRPO 低于 SFT 3.68 / 3.30 个百分点”不能成立。
+GRPO 实际从 8 月 16 日重新训练的新 SFT 模型出发，但当时引用的 33.38% / 29.06% 来自
+8 月 8 日另一个已经丢失的 SFT checkpoint。对真实起点补做诊断评测后，新 SFT 在同一份
+val 788 题上为 official 29.19%、strict 25.76%；旧 GRPO 为 29.70%、25.76%。因此可观察到的
+差值是 official +0.51、strict +0.00，而不是原先记录的下降。
+
+同时从训练日志的 resolved config 确认 `data.apply_chat_template_kwargs={}`。Qwen3 因此在 GRPO
+rollout 时默认开启 thinking，而 SFT 与最终生成都显式关闭 thinking。已在训练入口加入
+`+data.apply_chat_template_kwargs.enable_thinking=False`。修正后的 3 步 smoke 完成，三步耗时约
+94.7 / 97.6 / 105.5 秒，response length 均值约 55–59 token，没有再被思考段占满；784 条
+train/val rollout 无执行错误。
+
+训练内 val 也不再取文件开头 200 条，而是用 seed=0 固定随机抽样；新子集覆盖全部 3 个
+验证数据库。rollout 日志新增 split 和样本索引，之后可以把训练 rollout 与定期验证分开分析。
+
+### 为什么这么设计
+
+强化学习结果必须和它真正出发的 checkpoint 比。两个 SFT 都叫“1 epoch、LoRA rank 32”并不
+代表权重相同；只比较配置名和 loss，无法替代对起点本身的评测。旧结论把不同 checkpoint 的
+数字拼在一起，因而不能进入 README 或简历。
+
+thinking 不只是输出样式：它会改变 rollout token 数、截断位置和训练分布。训练开、评测关时，
+即使 reward 代码完全正确，最终数字也回答不了原实验问题。验证子集同理；固定取前 200 条会被
+数据原有顺序影响，且旧 manifest 还在切片前统计数据库数，掩盖了样本偏置。
+
+### 还没验证的
+
+- 上述新 SFT 与旧 GRPO 数字是云端诊断评测，因临时评测目录没有完整 Git 元数据，未写入
+  `results/runs.jsonl`，不能作为对外汇报数字。
+- 新 SFT 为什么没有复现旧 SFT 的 33.38% 仍未完全解释。已排除“prompt 也参与 loss”和
+  “assistant 边界不是 token 前缀”两种怀疑；训练框架差异和随机性仍待查。
+- corrected GRPO 原计划 50 步，但按预设止损规则在第一个 checkpoint 停止：新随机 val 200 条上
+  step 0→10 的 strict reward 为 0.265→0.260、official 为 0.320→0.310。终止信号生效前训练侧
+  又完成约两步，但只有 step 10 checkpoint 被保存。将该 checkpoint 导出并在完整 val 788 题
+  上诊断评测后，得到 official 29.31%、strict 25.63%；相对直接 SFT 分别为 +0.12、-0.13 个
+  百分点，即各相差 1 题，没有可测量提升。这些仍是未入正式台账的诊断数字。
+---
+
+## 2026-08-17 · 里程碑 17：排除 prompt 截断，加入 schema 对照并对齐 official reward
+
+### 做了什么
+
+先用固定随机种子 0 从 val 788 题中抽取与训练内评测一致的 200 题，再用
+Qwen3-1.7B 的真实 tokenizer 和关闭 thinking 的 chat template 逐题计数。完整 schema 的
+prompt token 数为 p50 6626、p99 6715、最大 6722；在 8192 的 prompt 上限下，超限为
+0/200。因此此前“完整 schema 超过上限，问题或关键列被截掉”的猜测被排除。
+
+新增了三种可复用的 schema 诊断模式：完整 schema；只根据问题和 evidence 做词面匹配、
+同时补充外键相邻表的 linked schema；读取 gold SQL 所用表的 oracle schema。相同 200 题上，
+linked 的 token 数为 p50 2397、p99 6715、最大 6722，oracle 为 p50 311、p99 652、最大 727，
+两者也都没有超限。生成脚本会逐题记录所选表和 prompt 长度，RL 数据构建脚本也能生成
+linked 版本，oracle 则明确禁止进入训练数据。
+
+GRPO 默认主奖励从 strict 改为 BIRD official Execution Accuracy，与最终 checkpoint 选择和
+对外汇报指标一致。strict 仍对每条 rollout 计算并写日志；`official=True、strict=False` 会继续
+计入 hack rate，用来监控模型是否只利用了官方评测忽略重复行的宽松口径。训练入口同时固定
+DataLoader worker 为 0，避免已观察到的训练结束阶段 worker 信号竞态。
+
+### 为什么这么设计
+
+字符数除以经验系数只适合预警，不能证明真实 tokenizer 会超限。大 schema 中重复的长标识符
+压缩效率较高，本次精确计数比保守估算低约三分之一；如果按估算直接修改模型或截断策略，
+会把不存在的 bug 当成主因。现在剩下的可检验问题是：即使不截断，约 6600 token 的无关 schema
+是否仍会干扰 1.7B 模型。full / linked / oracle 三组只改变 schema，其余 checkpoint、题目和
+解码参数保持一致，可以把这个问题单独测出来。
+
+official reward 也不是没有代价。此前 500 条结果中已观察到 25 条漏写 `DISTINCT` 却被官方
+集合比较判对的案例。因此这次没有删除 strict 验证器，而是把它从“发奖励”改成“监控风险”：
+训练目标和最终考试对齐，同时保留发现指标利用的证据。
+
+### 还没验证的
+
+- 尚未启动模型推理，所以 full、linked、oracle 三种 schema 的准确率只有待运行方案，没有结果。
+- linked 是确定性的轻量词面 schema linker，表召回率和对复杂多跳 JOIN 的影响尚未测量。
+- 当前 linked 在 200 题上覆盖了 194 题的全部 oracle 表（97%）；剩余 6 题中至少 1 题是
+  BIRD 原始 train 自带的明显 question–gold SQL 错配。其余漏表是否也含标注问题尚未审计。
+- oracle 使用 gold SQL，只是诊断上界，不能作为可部署方案、正式指标或训练输入。
+- official reward 配置已通过本地测试，但尚未完成新的 GRPO 训练；不能声称它会带来提升。
+- 本次新增及修改代码所在工作树仍为 dirty；诊断 token 统计不能替代正式模型评测记录。
+
+---
+
+## 2026-08-17 · 里程碑 18：schema 对照完成，linked 与 oracle 均显著高于 full
+
+### 做了什么
+
+在同一个已校验的强 SFT checkpoint 上，对 seed=0 固定 val 200 题完成三组确定性推理。
+三组均使用 temperature=0、top_p=1、seed=0、max_new_tokens=512、关闭 thinking，唯一变量是
+schema：full、只看问题与 evidence 的 linked、以及读取 gold SQL 所用表的 oracle。
+
+诊断结果如下：
+
+| schema | official EX | strict EX |
+|---|---:|---:|
+| full | 33.0% | 27.0% |
+| linked | 39.5% | 34.0% |
+| oracle | 48.0% | 41.0% |
+
+逐题配对后，linked 相对 full 在 official 上新增答对 23 题、丢掉 10 题，净增 13 题；
+strict 上新增答对 21 题、丢掉 7 题，净增 14 题。oracle 相对 full 的 official 净增 30 题。
+linked 评测有 1 条 SQL 执行超时，full 和 oracle 没有超时。三组预测、meta 和逐题 outcome 已归档在
+F37 数据盘 `/root/autodl-tmp/schema_ablation_results.zip`，实例随后已关机。
+
+### 为什么这么设计
+
+精确 tokenizer 已证明 full prompt 最大 6722 token，没有超过 8192，所以结果不能解释为“题目被
+截断”。更符合证据的解释是：1.7B 模型虽然收到了完整 schema，但在约 42 张表和大量无关列中
+选择正确对象很困难。linked 在不接触 gold SQL 的情况下提升 6.5 个 official 百分点，而 oracle
+再提高到 48%，说明当前最值得投入的是 schema linking/pruning，不是盲目增加 GRPO 步数。
+
+两套验证器同时上涨也很重要：linked 的 strict 提升 7 点，高于 official 的 6.5 点，因此这次
+改善不是单纯利用 BIRD official 忽略重复行的规则。逐题配对仍有 10 道 full 对而 linked 错，说明
+当前词面 linker 会漏掉或误删有用表，不能把 oracle 上界当成已解决。
+
+诊断中还确认固定 val 的 question_id 7102 在 BIRD 原始 train.json 中就是明显错标：问题问产品
+钻头废品率，gold SQL 却复制了另一题的员工休假/病假查询。这不是切分脚本重排造成的，但说明
+train 来源存在少量标签噪声。该题对三组都相同，最多直接影响本次 200 题中的 0.5 个百分点，
+不足以解释 6.5--15 点的 schema 差异。
+
+### 还没验证的
+
+- 这些数字来自 dirty 工作树上的诊断运行，按项目纪律未写入 runs.jsonl，不能直接进入 README
+  成绩表或简历。
+- 还没有在完整 val 788 题上复现 linked 的提升，也没有在 Mini-Dev 上读取最终一次性指标。
+- linked 对 fixed val 200 的 oracle 表全召回率为 97%，仍有 6 题漏表；正式训练前还需减少漏表。
+- official reward 和 linked RL 数据已经能构建并通过本地测试，但新的 GRPO 尚未运行，不能预设
+  schema 改进会让 RL 本身继续涨分。
+
+---
+
+## 2026-08-17 · 里程碑 19：完整 val 的 linker 静态覆盖诊断
+
+### 做了什么
+
+在固定 val 788 题上，用 Qwen3-1.7B 的真实 tokenizer 补跑了逐题 schema 诊断。linked schema
+完整保留每题 gold SQL 所需表的比例是 772/788（97.97%），平均逐表召回率为 99.08%。在 gold
+涉及至少两张表、且这些表在完整数据库外键图中可连通的 528 题里，linked 后仍保持连通的是
+523 题（99.05%）。5 道断连题中有 3 道同时漏了 gold 表，另有 2 道 gold 表都保留但中间桥接
+路径被裁掉。
+
+同时量化了干扰表：full 平均保留 39.97 张非 gold 表；linked 降至 23.53 张，P95 仍有 56 张，
+所选表中干扰表的平均占比为 85.8%。精确 prompt token 统计中，full 的 p50 / p99 / max 为
+6628 / 6702 / 6731，linked 为 2463 / 6638 / 6722，两者都没有超过 8192。
+
+### 为什么这么设计
+
+平均逐表召回率会掩盖关键失败：一题需要三张表时漏掉一张，这题通常就已经无法作答；只检查
+gold 表是否出现，又会漏掉必须经过中间表才能连接的多跳关系。因此诊断同时记录“每题所需表
+是否全部保留”和“裁剪后的外键图能否继续连接全部所需表”。后者只是 schema 层面的可达性，
+并不声称 gold SQL 一定使用了对应外键谓词。
+
+干扰表数量也必须和召回一起看。当前 linker 的确把中位 prompt 缩短了约 63%，但平均仍留下
+23.53 张干扰表；它是一个有信号的轻量基线，不是已经解决的 schema linking 系统。
+
+### 还没验证的
+
+- 这一步只测 schema 覆盖和 token 长度，没有调用模型，不能据此声称完整 val 准确率提升。
+- val 200 上 linked 相对 full 的模型分数提升来自 dirty 诊断运行；还需在干净 commit 上用完整
+  val 788、同一强 SFT checkpoint 和固定解码复现。
+- 只有完整 val 的 paired 结果稳定后，才会用 linked schema 与 official reward 重跑普通 GRPO；
+  当前没有证据说明 GRPO 会额外提升。

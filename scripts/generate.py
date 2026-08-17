@@ -27,13 +27,14 @@ import _bootstrap  # noqa: F401
 import httpx
 
 from text2sql_rlvr.data import (
+    SCHEMA_MODES,
     SPLITS,
     PromptConfig,
     build_messages,
     discover_split,
     fetch_sample_rows,
-    format_schema,
     load_schema,
+    render_selected_schema,
 )
 from text2sql_rlvr.sql import extract_sql
 
@@ -65,6 +66,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     parser.add_argument("--schema-style", choices=("ddl", "compact"), default="ddl")
+    parser.add_argument("--schema-mode", choices=SCHEMA_MODES, default="full",
+                        help="oracle is a gold-SQL upper bound for diagnosis only")
+    parser.add_argument("--schema-max-chars", type=int, default=0,
+                        help="linked/oracle schema character budget; 0 keeps all selected tables")
     parser.add_argument("--descriptions", action="store_true", help="include column descriptions")
     parser.add_argument("--sample-rows", type=int, default=0)
     parser.add_argument("--no-evidence", action="store_true")
@@ -111,10 +116,10 @@ def main(argv: list[str] | None = None) -> int:
     todo = [e for e in examples if e.question_id not in already]
     print(f"{len(todo)} to generate ({len(already)} already present)")
 
-    schema_cache: dict[str, str] = {}
+    schema_cache: dict[str, tuple[object, dict | None]] = {}
     schema_lock = threading.Lock()
 
-    def schema_text(db_id: str) -> str:
+    def cached_schema(db_id: str):
         with schema_lock:
             cached = schema_cache.get(db_id)
         if cached is not None:
@@ -126,15 +131,10 @@ def main(argv: list[str] | None = None) -> int:
             if config.sample_rows
             else None
         )
-        text = format_schema(
-            schema,
-            style=config.schema_style,
-            include_descriptions=config.include_descriptions,
-            sample_rows=samples,
-        )
+        cached = (schema, samples)
         with schema_lock:
-            schema_cache[db_id] = text
-        return text
+            schema_cache[db_id] = cached
+        return cached
 
     body_extra: dict[str, object] = {}
     if not args.thinking:
@@ -152,7 +152,17 @@ def main(argv: list[str] | None = None) -> int:
     handle = args.out.open("a" if args.resume else "w", encoding="utf-8")
 
     def generate(example):
-        messages = build_messages(example, schema_text(example.db_id), config)
+        schema, samples = cached_schema(example.db_id)
+        schema_text, selection = render_selected_schema(
+            schema,
+            example,
+            mode=args.schema_mode,
+            style=config.schema_style,
+            include_descriptions=config.include_descriptions,
+            sample_rows=samples,
+            max_chars=args.schema_max_chars,
+        )
+        messages = build_messages(example, schema_text, config)
         payload = {
             "model": args.model,
             "messages": messages,
@@ -178,6 +188,11 @@ def main(argv: list[str] | None = None) -> int:
                     "usage": data.get("usage", {}),
                     "latency_s": round(time.monotonic() - started, 3),
                     "error": None,
+                    "prompt_chars": sum(len(message["content"]) for message in messages),
+                    "schema_chars": selection.rendered_chars,
+                    "schema_mode": selection.mode,
+                    "selected_tables": list(selection.selected_tables),
+                    "n_tables_total": selection.total_tables,
                 }
             except Exception as exc:  # noqa: BLE001 - retried, then recorded
                 last_error = f"{type(exc).__name__}: {exc}"
@@ -191,6 +206,11 @@ def main(argv: list[str] | None = None) -> int:
             "usage": {},
             "latency_s": round(time.monotonic() - started, 3),
             "error": last_error,
+            "prompt_chars": sum(len(message["content"]) for message in messages),
+            "schema_chars": selection.rendered_chars,
+            "schema_mode": selection.mode,
+            "selected_tables": list(selection.selected_tables),
+            "n_tables_total": selection.total_tables,
         }
 
     failures = 0
@@ -223,6 +243,11 @@ def main(argv: list[str] | None = None) -> int:
             "thinking": args.thinking,
         },
         "prompt_config": config.as_dict(),
+        "schema_selection": {
+            "mode": args.schema_mode,
+            "max_chars": args.schema_max_chars,
+            "oracle_uses_gold_sql": args.schema_mode == "oracle",
+        },
         "request_failures": failures,
     }
     meta_path = args.out.with_suffix(args.out.suffix + ".meta.json")
