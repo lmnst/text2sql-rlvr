@@ -1101,3 +1101,69 @@ gold 表是否出现，又会漏掉必须经过中间表才能连接的多跳关
   val 788、同一强 SFT checkpoint 和固定解码复现。
 - 只有完整 val 的 paired 结果稳定后，才会用 linked schema 与 official reward 重跑普通 GRPO；
   当前没有证据说明 GRPO 会额外提升。
+
+---
+
+## 2026-08-17 · 里程碑 20：完整 val 复现 schema linking 提升
+
+### 做了什么
+
+在干净提交 `c9cf559`、同一个强 SFT checkpoint 和固定 val 788 上完成 full 与 linked schema
+的确定性对照。解码配置均为 temperature=0、top_p=1、seed=0、max_new_tokens=512、关闭
+thinking，只有 schema 选择不同。BIRD official EX 从 full 的 32.87%（259/788）提高到 linked
+的 37.94%（299/788），增加 5.07 个百分点；strict EX 从 28.68%（226/788）提高到
+33.63%（265/788），增加 4.95 个百分点。official 逐题配对为新增答对 76 题、丢掉 36 题，
+净增 40 题；strict 净增 39 题。两组都没有执行超时或缺失预测。
+
+### 为什么这么设计
+
+完整 788 题复现排除了固定 val 200 小样本偶然波动，也满足了同 checkpoint、同题目、同解码、
+只替换 schema 的公平比较。official 和 strict 同时提升约 5 点，且逐题净增 40 题，说明 linked
+schema 的收益不是由官方集合比较口径单独造成。结合里程碑 19 的 token 统计，主要问题不是
+超过 8192 后被截断，而是小模型受到大量无关表和列的干扰。
+
+### 还没验证的
+
+- 轻量 linker 仍有 16/788 题未保留全部 gold 表，且平均还保留 23.53 张干扰表，不能称为
+  已解决 schema linking。
+- 这些指标来自 train 中固定划出的 val，不是 BIRD dev 最终成绩；dev 仍未用于调参或选点。
+- schema linking 已有稳定收益，但这一步本身不能证明 GRPO 会在其上继续提升。
+
+---
+
+## 2026-08-17 · 里程碑 21：official reward 普通 GRPO 完成，但没有明确额外收益
+
+### 做了什么
+
+用 BIRD train 中固定抽取的 500 个 prompt、linked schema 和 BIRD official EX 主奖励，完成一次
+普通 GRPO：Qwen3-1.7B、LoRA、每题 4 个 rollout、30 个 step，不使用 Dynamic Sampling，
+thinking 关闭。训练与固定 val 200 无重叠。val 200 的 SFT 起点为 39.5%，step 10、20、30
+均为 40.0%，因此按预先设定的“最高分并列时取最早 checkpoint”规则选择 step 10。
+
+所选 checkpoint 在完整固定 val 788、temperature=0 的 linked-schema 评测中，official EX 为
+38.20%（301/788），strict EX 为 33.88%（267/788）。对应 SFT linked 基线分别为 37.94%
+（299/788）和 33.63%（265/788）。official 逐题配对为新增答对 12 题、丢掉 10 题，净增 2 题；
+strict 为新增 11 题、丢掉 9 题，同样净增 2 题。正式评测记录来自干净提交，run_id 为
+`53d1586c7d33`。
+
+训练后还验证了 verl 0.9 保存的 `.pt` LoRA checkpoint 可以精确重建 PEFT 权重并合并成标准
+Hugging Face 模型。首次自动合并因数据盘写满失败；只删除可重新生成的 step 10 临时合并模型后，
+从 checkpoint 续跑并完成 788 题推理，没有重训或改变 checkpoint 选择。
+
+### 为什么这么设计
+
+训练 reward 与最终 BIRD official 指标对齐，消除了旧实验中“官方会判对、strict 却给 0 奖励”
+的口径错位；linked schema 又先在完整 val 上独立证明有效，因此这次能公平观察 GRPO 的增量。
+checkpoint 只用固定 val 200 选择，完整 val 788 只用于最终比较，避免在 788 题结果上事后挑点。
+
+结果只能解释为基本持平：+2/788（+0.26 个百分点）很小，同时存在 12 个 gain 和 10 个 loss，
+不足以声称 GRPO 有稳定提升。相比之下，schema linking 的净增是 40/788，才是当前证据明确的
+主要贡献。
+
+### 还没验证的
+
+- GRPO 只有一个随机种子、500 个训练 prompt 和 30 个 step；没有置信区间或多种子证据。
+- 没有做 Dynamic Sampling、clip-higher 或更大训练集消融；当前结果不证明这些方法无效，只说明
+  本次普通 GRPO 没有带来可确认的额外收益。
+- BIRD dev 仍未读取。当前项目可以诚实汇报固定 train-val 上的 schema linking 对照与 GRPO
+  负结果，但不能把 38.20% 写成 dev 成绩。
