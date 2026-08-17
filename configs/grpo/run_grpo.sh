@@ -58,8 +58,8 @@ python3 -m verl.trainer.main_ppo \
   ++actor_rollout_ref.rollout.free_cache_engine=False \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1 \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
-  custom_reward_function.path=/root/autodl-tmp/verl_reward.py \
-  custom_reward_function.name=compute_score \
+  reward.custom_reward_function.path="$PWD/scripts/verl_reward.py" \
+  reward.custom_reward_function.name=compute_score \
   trainer.use_v1=False \
   trainer.n_gpus_per_node=1 \
   trainer.nnodes=1 \
