@@ -441,6 +441,40 @@ v3b 的输出是 JSON 对象，解析时列名前缀的表也算选中，所以�
 Person 就不会漏。对比三行：v2 贪心的 model all-gold 是 0.787 / 0.728（held-out / val 788），
 `hard` 行是 0.526 / 0.451。v3 要看的就是这两个数有没有实质上升。
 
+## 第 15 步：agent 循环，单次生成对比带自纠错
+
+`scripts/run_agent.py` 和 generate.py 一样在本地跑，模型每轮一个动作：`DESCRIBE 表名`、
+一个 ```sql 块（执行并把结果或报错回给它）、或 `FINAL` 加 ```sql 块（提交）。默认每题
+最多 4 轮。输出文件 evaluate.py 直接能打分。
+
+先 20 题冒烟，看模型守不守协议：
+
+```bash
+python scripts/run_agent.py --questions data/processed/val.json --split train --model Qwen3-1.7B --schema-mode linked --out results/preds/agent_smoke.jsonl --limit 20 --concurrency 4
+```
+
+看屏幕上的 `agent summary`：`stop_reasons` 里 `final` 应该占多数，`no_sql` 接近 0；
+`n_recovered_from_first_error` 是第一次执行报错、最终 SQL 能执行的题数。再看两条轨迹：
+
+```bash
+python -c "import json;r=json.loads(open('results/preds/agent_smoke.jsonl',encoding='utf-8').readline());[print(m['role'].upper(),':',m['content'][-300:],'\n') for m in r['messages'][2:]]"
+```
+
+正式跑 val 788，schema 用 selector 扩展后的选集，没展示的表模型可以 DESCRIBE：
+
+```bash
+python scripts/run_agent.py --questions data/processed/val.json --split train --model Qwen3-1.7B --selected-tables results/selector/val788_v2.jsonl --selected-field expanded_tables --out results/preds/val788_agent_selector_v2.jsonl
+```
+
+```bash
+python scripts/evaluate.py --questions data/processed/val.json --split train --predictions results/preds/val788_agent_selector_v2.jsonl --stage ablation --notes "val788, agent loop max 4 turns, schema = selector v2 expanded, generator Qwen3-1.7B base"
+```
+
+和第 10 步的四组放在一起就是完整对照：full、linked、selector 扩展、oracle 是单次生成，
+这一行是 selector 扩展加循环。差值就是"执行反馈自纠错"带来的提升，也是这个项目要讲的故事。
+
+每题最多 4 次模型调用，788 题大约是单次生成的 2 到 3 倍时间。
+
 ## 出问题时对照这里
 
 | 现象 | 原因 | 处理 |
