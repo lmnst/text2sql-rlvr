@@ -190,3 +190,31 @@ def test_resume_skips_already_generated_ids(generate_module, server, bird_root, 
     run(generate_module, server, bird_root, out, "--resume")
     assert len(server.requests) == 5  # 2 from before, 3 new
     assert len(read(out)) == 5
+
+
+def test_selected_tables_override_schema_and_fall_back_when_missing(
+    generate_module, server, bird_root, tmp_path
+):
+    preds = tmp_path / "selector.jsonl"
+    preds.write_text(
+        json.dumps({"question_id": 0, "predicted_tables": ["dept"]}) + "\n"
+        + json.dumps({"question_id": 1, "predicted_tables": []}) + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "preds.jsonl"
+    run(generate_module, server, bird_root, out, "--limit", "3", "--concurrency", "1",
+        "--selected-tables", str(preds), "--selected-fallback", "full")
+
+    by_id = {r["question_id"]: r for r in read(out)}
+    assert by_id[0]["schema_mode"] == "predicted"
+    assert by_id[0]["selected_tables"] == ["dept"]
+    assert by_id[1]["schema_mode"] == "full"  # empty prediction -> fallback
+    assert by_id[2]["schema_mode"] == "full"  # no prediction at all -> fallback
+
+    prompts = {r["messages"][1]["content"] for r in server.requests}
+    assert any("CREATE TABLE dept" in p and "CREATE TABLE staff" not in p for p in prompts)
+
+    meta = json.loads(out.with_suffix(".jsonl.meta.json").read_text(encoding="utf-8"))
+    assert meta["schema_selection"]["mode"] == "predicted"
+    assert meta["schema_selection"]["n_fallback"] == 2
+    assert meta["schema_selection"]["fallback_mode"] == "full"

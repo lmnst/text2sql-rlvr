@@ -22,7 +22,7 @@ DEFAULT_LEDGER = Path("results/runs.jsonl")
 
 REQUIRED_FIELDS = ("stage", "split", "n_samples", "metrics")
 
-_STAGES = ("baseline", "sft", "grpo", "ablation", "smoke")
+_STAGES = ("baseline", "sft", "grpo", "ablation", "smoke", "selector")
 
 _write_lock = threading.Lock()
 

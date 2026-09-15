@@ -9,6 +9,7 @@ be used for a reported model score or for RL training.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from text2sql_rlvr.data.bird import BirdExample
@@ -150,6 +151,25 @@ def required_tables_fk_connected(
     return required <= seen
 
 
+def _ranked_tables(schema: DatabaseSchema, question: str, evidence: str) -> list[Table]:
+    return sorted(
+        schema.tables,
+        key=lambda table: (-_table_score(table, question, evidence), table.name.casefold()),
+    )
+
+
+def lexical_table_ranking(
+    schema: DatabaseSchema, question: str, evidence: str = ""
+) -> tuple[str, ...]:
+    """Every table of the schema, best lexical match first, ties broken by name.
+
+    This is the ordering the ``linked`` mode is built on. Exposed so the
+    selector data builder can record how deep a gold table sits in it: a gold
+    table far down this list is one no word-overlap rule will find.
+    """
+    return tuple(table.name for table in _ranked_tables(schema, question, evidence))
+
+
 def linked_table_names(
     schema: DatabaseSchema,
     question: str,
@@ -158,10 +178,7 @@ def linked_table_names(
     min_tables: int = 3,
 ) -> tuple[str, ...]:
     """Rank tables using only lexical evidence available at inference time."""
-    ranked = sorted(
-        schema.tables,
-        key=lambda table: (-_table_score(table, question, evidence), table.name.casefold()),
-    )
+    ranked = _ranked_tables(schema, question, evidence)
     direct = [table.name for table in ranked if _table_score(table, question, evidence) > 0]
     selected = direct or [table.name for table in ranked[:min_tables]]
     selected = list(dict.fromkeys(selected + sorted(_fk_neighbours(schema, set(selected)))))
@@ -207,7 +224,24 @@ def select_schema(
     *,
     mode: str = "full",
     min_tables: int = 3,
+    tables: Sequence[str] | None = None,
 ) -> SchemaSelection:
+    """Pick the tables for one prompt.
+
+    ``tables`` bypasses ``mode``: it is the output of a trained selector for
+    this question and is used as given (unknown names dropped, schema order
+    kept). Such a selection is labelled ``predicted``.
+    """
+    if tables is not None:
+        by_name = {table.name.casefold(): table.name for table in schema.tables}
+        wanted = {name.casefold() for name in tables}
+        names = tuple(name for key, name in by_name.items() if key in wanted)
+        return SchemaSelection(
+            schema=_subset(schema, names),
+            mode="predicted",
+            selected_tables=names,
+            total_tables=len(schema.tables),
+        )
     if mode not in SCHEMA_MODES:
         raise ValueError(f"schema mode must be one of {SCHEMA_MODES}, got {mode!r}")
     if mode == "full":
@@ -242,9 +276,11 @@ def render_selected_schema(
     include_descriptions: bool = False,
     sample_rows: dict[str, list[tuple[object, ...]]] | None = None,
     max_chars: int = 0,
+    tables: Sequence[str] | None = None,
 ) -> tuple[str, SchemaSelection]:
     """Select and render whole table blocks, never cutting a DDL statement in half."""
-    selection = select_schema(schema, example, mode=mode)
+    selection = select_schema(schema, example, mode=mode, tables=tables)
+    mode = selection.mode
     selected = list(selection.schema.tables)
     exceeded = False
     if max_chars > 0 and mode != "full":

@@ -36,6 +36,8 @@ from text2sql_rlvr.data import (
     load_schema,
     render_selected_schema,
 )
+from text2sql_rlvr.data.selector import load_selected_tables
+from text2sql_rlvr.ledger import file_sha256
 from text2sql_rlvr.sql import extract_sql
 
 
@@ -70,6 +72,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="oracle is a gold-SQL upper bound for diagnosis only")
     parser.add_argument("--schema-max-chars", type=int, default=0,
                         help="linked/oracle schema character budget; 0 keeps all selected tables")
+    parser.add_argument("--selected-tables", type=Path, default=None,
+                        help="evaluate_selector.py output; use its predicted_tables per question "
+                             "instead of --schema-mode (recorded as schema mode 'predicted')")
+    parser.add_argument("--selected-fallback", choices=("full", "linked"), default="full",
+                        help="schema mode for questions whose prediction is empty or missing")
+    parser.add_argument("--selected-field", default="predicted_tables",
+                        help="which field of --selected-tables to use: predicted_tables (raw "
+                             "model answer) or expanded_tables (with FK/lexical expansion)")
     parser.add_argument("--descriptions", action="store_true", help="include column descriptions")
     parser.add_argument("--sample-rows", type=int, default=0)
     parser.add_argument("--no-evidence", action="store_true")
@@ -116,6 +126,15 @@ def main(argv: list[str] | None = None) -> int:
     todo = [e for e in examples if e.question_id not in already]
     print(f"{len(todo)} to generate ({len(already)} already present)")
 
+    selected = (
+        load_selected_tables(args.selected_tables, args.selected_field)
+        if args.selected_tables
+        else None
+    )
+    if selected is not None:
+        print(f"schema from selector predictions: {args.selected_tables} [{args.selected_field}] "
+              f"({len(selected)} questions; fallback '{args.selected_fallback}')")
+
     schema_cache: dict[str, tuple[object, dict | None]] = {}
     schema_lock = threading.Lock()
 
@@ -153,14 +172,20 @@ def main(argv: list[str] | None = None) -> int:
 
     def generate(example):
         schema, samples = cached_schema(example.db_id)
+        mode, tables = args.schema_mode, None
+        if selected is not None:
+            tables = selected.get(example.question_id) or None
+            if tables is None:
+                mode = args.selected_fallback
         schema_text, selection = render_selected_schema(
             schema,
             example,
-            mode=args.schema_mode,
+            mode=mode,
             style=config.schema_style,
             include_descriptions=config.include_descriptions,
             sample_rows=samples,
             max_chars=args.schema_max_chars,
+            tables=tables,
         )
         messages = build_messages(example, schema_text, config)
         payload = {
@@ -214,12 +239,15 @@ def main(argv: list[str] | None = None) -> int:
         }
 
     failures = 0
+    fallbacks = 0
     try:
         with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
             for done, record in enumerate(pool.map(generate, todo), start=1):
                 record["sql"] = extract_sql(record["completion"])
                 if record["error"]:
                     failures += 1
+                if selected is not None and record["schema_mode"] != "predicted":
+                    fallbacks += 1
                 with write_lock:
                     handle.write(json.dumps(record, ensure_ascii=False) + "\n")
                     handle.flush()
@@ -244,9 +272,16 @@ def main(argv: list[str] | None = None) -> int:
         },
         "prompt_config": config.as_dict(),
         "schema_selection": {
-            "mode": args.schema_mode,
+            "mode": "predicted" if selected is not None else args.schema_mode,
             "max_chars": args.schema_max_chars,
             "oracle_uses_gold_sql": args.schema_mode == "oracle",
+            "selected_tables_path": str(args.selected_tables) if selected is not None else None,
+            "selected_field": args.selected_field if selected is not None else None,
+            "selected_tables_sha256": (
+                file_sha256(args.selected_tables) if selected is not None else None
+            ),
+            "fallback_mode": args.selected_fallback if selected is not None else None,
+            "n_fallback": fallbacks,
         },
         "request_failures": failures,
     }
@@ -255,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"\nwrote {args.out}")
     print(f"meta  {meta_path}")
+    if selected is not None:
+        print(f"selector fallback to '{args.selected_fallback}' schema: {fallbacks} questions")
     if failures:
         print(f"WARNING: {failures} requests failed after retries")
     return 0
