@@ -1,0 +1,444 @@
+[
+  {
+    "question_id": 7531,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "identifier_scope",
+      "schema_linking",
+      "projection_contract"
+    ],
+    "evidence": "SELECT 的 OBJ_SAMPLE_ID 在联表后未限定表名；题目和 evidence 要的是 OBJ_CLASS，但预测没有连接 OBJ_CLASSES，且输出样本 ID。重复的 IMG_ID 连接条件并不能补回名称列。"
+  },
+  {
+    "question_id": 7474,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "aggregation"
+    ],
+    "evidence": "把 COUNT(OBJ_SAMPLE_ID)>20 放进 WHERE 导致聚合误用；应先按 IMG_ID 分组、HAVING 筛选，再由外层统计图片数。这是可直接从 SQL 确认的聚合层级错误。"
+  },
+  {
+    "question_id": 7577,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "aggregation",
+      "label_conflict"
+    ],
+    "evidence": "IMG_OBJ 只有 OBJ_CLASS_ID，OBJ_CLASS 在 OBJ_CLASSES，预测漏了名称表连接；整数计数相除也缺少浮点转换。另：gold 的 windows 过滤作用于整个查询，分子没有限定 image 5，分母也不是 image 5 全部对象，与 evidence 的比例定义冲突；不能将 gold 原样用于合成模板。"
+  },
+  {
+    "question_id": 7575,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "projection_contract",
+      "label_conflict"
+    ],
+    "evidence": "把 sparse 当成 OBJ_CLASS，而题目明确说属性，需经 ATT_CLASSES/IMG_OBJ_ATT 查找。gold 额外输出未被题目明确要求的 OBJ_SAMPLE_ID，且只按 IMG_ID 连 IMG_OBJ、未使用复合外键中的 OBJ_SAMPLE_ID；因此列数报错不能完全归责于预测漏列。"
+  },
+  {
+    "question_id": 7498,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "predicate_semantics"
+    ],
+    "evidence": "lying on 是 PRED_CLASSES/IMG_REL 的关系，预测去 ATT_CLASSES/IMG_OBJ_ATT 找属性；同时漏了 OBJ2_SAMPLE_ID=1。这里可执行但空结果的直接语义问题是选错关系表与漏条件。"
+  },
+  {
+    "question_id": 7590,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "predicate_semantics",
+      "label_conflict"
+    ],
+    "evidence": "预测无依据增加 reading 属性筛选，将关系与属性混淆；gold 则没有实现题目/evidence 所要求的同一对象对存在多种关系，也没有对图片去重。模型缺陷与参考答案疑点须分别保留。"
+  },
+  {
+    "question_id": 7581,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "aggregation",
+      "label_conflict",
+      "verifier_capped"
+    ],
+    "evidence": "预测用对象 ID 多样性代替同一对象对的关系多样性；gold 按 PRED_CLASS_ID 分组后输出非分组 IMG_ID，也没有实现题意中的多关系。预测结果触及存档行数上限，不能用截断后的集合推断完整查询对错。"
+  },
+  {
+    "question_id": 1478,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "identifier_scope",
+      "predicate_semantics",
+      "label_conflict"
+    ],
+    "evidence": "CODE/DESCRIPTION 未限定来源而产生歧义；预测没有实际筛出 underweight。gold 完全未查询 conditions，输出 BMI 的描述、数值、单位，与最常见疾病问题明显不一致，应隔离参考答案争议。"
+  },
+  {
+    "question_id": 1542,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "aggregation",
+      "schema_linking",
+      "projection_contract"
+    ],
+    "evidence": "AVG 直接放在 WHERE 无分组/子查询，执行失败；更深一层是把患者 ID 连到疾病名称 ITEM，漏了 conditions 作为桥接。预测把姓名拼成一列，gold 是 first/last 两列，属于独立输出约定差异。"
+  },
+  {
+    "question_id": 1495,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "entity_grounding",
+      "predicate_semantics",
+      "sqlite_translation",
+      "evidence_conflict"
+    ],
+    "evidence": "预测缺失 Laronda/Bernier 姓名条件，把日期差再格式化为日期，并用 MIN 选最早记录。原 evidence 把 most recent 写成 MIN，与题意及 gold 的 DESC 冲突。存档仅证明超时，不能在未做执行对照前认定某一缺陷就是超时的唯一原因。"
+  },
+  {
+    "question_id": 1474,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "identifier_scope",
+      "entity_grounding",
+      "predicate_semantics",
+      "label_conflict"
+    ],
+    "evidence": "引用未声明的 LEGACY.MEDICATIONS.START，且用就诊日期代替药物 STOP；又把姓名字符串和 patient ID 比较。gold 药物名称比题目/evidence 多一个前导空格，值匹配需结合数据库核验，不能仅靠字面替换。"
+  },
+  {
+    "question_id": 1386,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "sqlite_translation",
+      "entity_grounding"
+    ],
+    "evidence": "DATEDIFF 不属于本实验 SQLite 支持的函数，存档报错已确认；此外 PATIENT 是 ID，不能等于带称谓的人名。仅替换日期函数无法保证答对，需同时处理患者表连接和实体条件。"
+  },
+  {
+    "question_id": 1359,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "entity_grounding",
+      "projection_contract"
+    ],
+    "evidence": "已经正确连接 observations 与 patients，却把 p.patient 与 Elly Koss 人名比较；应对 first/last 施加姓名条件。另未输出 gold 的 units。这个例子说明不能把所有空结果或列数差异都归为漏 JOIN；单位输出也需要明确约定。"
+  },
+  {
+    "question_id": 1484,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "cardinality",
+      "label_conflict"
+    ],
+    "evidence": "预测按同一次 ENCOUNTER 找处置与药物，gold 按同一 PATIENT 组合所有记录，二者粒度不同；问题措辞未明确同次就诊还是患者全部历史。不能直接判定更宽的 gold JOIN 就是唯一正确语义，构造新数据应把时间/就诊范围写清。"
+  },
+  {
+    "question_id": 1397,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "predicate_semantics",
+      "aggregation",
+      "cardinality"
+    ],
+    "evidence": "缺少明确要求的 DESCRIPTION='DTaP'；COUNT(*) 统计接种记录而不是 COUNT(DISTINCT patient) 统计患者。属于漏过滤条件与统计实体粒度两个可分离错误。"
+  },
+  {
+    "question_id": 1387,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "sqlite_translation",
+      "predicate_semantics",
+      "label_conflict"
+    ],
+    "evidence": "使用 ? : 三元运算符而非 SQLite CASE，且排序表达式未减去 START，未计算持续时间。gold 的持续时间表达式默认升序 LIMIT 1，又与 longest 冲突；不能以 gold 排序方向作为合成指导。"
+  },
+  {
+    "question_id": 7255,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "identifier_scope",
+      "schema_linking",
+      "sqlite_translation",
+      "projection_contract"
+    ],
+    "evidence": "BusinessEntityID 未限定产生第一条报错；后续还引用不存在的 Age、漏 EmployeePayHistory 的 Rate，把职业放进 PersonType 而非 Employee.JobTitle，并输出多余姓名/ID。单修第一条报错不等于完成修复。"
+  },
+  {
+    "question_id": 7199,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "predicate_semantics",
+      "output_format",
+      "generation_truncation",
+      "label_conflict"
+    ],
+    "evidence": "生成反复嵌套的无关 Home 地址/HR Contact 条件，最终 SQL 停在 IN (，原始输出 finish_reason=length。gold 硬编码 BusinessEntityID IN (212,274)，题目/evidence 未提供这些 ID；不应学习这些常量作为通用招聘逻辑。"
+  },
+  {
+    "question_id": 7043,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "output_format",
+      "schema_linking",
+      "label_conflict"
+    ],
+    "evidence": "输出两条 SELECT 被单语句规则拒绝；BOMLevel 不属于 Product。gold 用两个标量子查询合成单行，但完全没有输出题目要求的组件深度，参考答案也不完整。新数据需明确输出列并提供组件表路径。"
+  },
+  {
+    "question_id": 7381,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "sqlite_translation",
+      "projection_contract"
+    ],
+    "evidence": "SalesPerson 不含 FirstName/MiddleName/LastName，需通过 BusinessEntityID 连 Person。SQLite 的 + 不是字符串拼接运算符；并且拼一列与 gold 分三列是另一问题。适合设计姓名所在表与 ID 表的关联训练，避免照抄 evidence 中的加号。"
+  },
+  {
+    "question_id": 7435,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "sqlite_translation",
+      "schema_linking",
+      "aggregation"
+    ],
+    "evidence": "YEAR 函数执行失败；题目问历史成本，gold 从 ProductCostHistory 读 StartDate，预测读 Product 的 SellStartDate，时间含义不同。按每个 ProductID 分组求 MIN 也未选出全局最小产品，不能只补函数转换。"
+  },
+  {
+    "question_id": 7358,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "entity_grounding",
+      "projection_contract"
+    ],
+    "evidence": "编造 ProductOnLocation 表；已有 ProductInventory→Product 的关联就可按产品名查 Shelf。预测的 down tube 大小写与 gold 的 Down Tube 不同，SQLite 当前比较能否命中需查值；还额外输出 LocationID。"
+  },
+  {
+    "question_id": 7307,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "projection_contract",
+      "label_conflict"
+    ],
+    "evidence": "预测实现 AVG、DESC、LIMIT 3，贴近题目最高平均评分前 3 名，但额外输出评分；gold 使用 SUM、LIMIT 1，明确与题目/evidence 冲突。不能将此题整体解释为模型不会 top-k，也不能照抄 gold 合成。"
+  },
+  {
+    "question_id": 7361,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "predicate_semantics"
+    ],
+    "evidence": "evidence 明确 ReferenceOrderID，预测改取 SalesOrderNumber；将 CustomerID 与 ProductID 相连，两者语义不同。需从 Product 连 TransactionHistory 获取引用订单 ID。可执行不代表关联键语义正确。"
+  },
+  {
+    "question_id": 7378,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "label_conflict"
+    ],
+    "evidence": "预测使用 SalesQuota<=50000，符合题目及 evidence 的阈值；gold 改为 SalesPersonQuotaHistory 并用 <500000，阈值大了十倍且不含等号。该例不能作为预测阈值错误的证据；当前表/历史表与人数/记录数也需澄清。"
+  },
+  {
+    "question_id": 7440,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "projection_contract",
+      "label_conflict",
+      "verifier_capped"
+    ],
+    "evidence": "预测列出不相等记录而非回答是否存在，输出形式不符合 yes/no；gold 对每一行输出 No/Yes，同样没有做全局 EXISTS，而且 gold 触及结果行数上限。应构造语义明确的 EXISTS 问题，不把这种 gold 逐行输出当标准。"
+  },
+  {
+    "question_id": 7093,
+    "reviewer": "codex",
+    "review_method": "raw completion and extractor inspection; paired extraction replay",
+    "labels": [
+      "extraction_pipeline"
+    ],
+    "evidence": "原始 completion 包含完整 SELECT e.JobTitle FROM Employee ... IN (SELECT ...)；旧提取器取最后一个行首 SELECT，截掉外层查询，才形成缺外层的子查询和孤立右括号。已核对原始文本及提取器代码，这是评测前处理错误，不能计为模型漏 JOIN/选错输出列。完整 SQL 的执行正确性见单独的提取修复重放记录。"
+  },
+  {
+    "question_id": 7580,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "aggregation",
+      "label_conflict"
+    ],
+    "evidence": "预测将 COUNT 放入 WHERE，执行失败；gold 则把数量条件 COUNT(...)=10 变成类别编号 OBJ_CLASS_ID=10。题目说 attribute classes、evidence 却指 OBJ_CLASS_ID，也存在对象类/属性类含义冲突。应隔离重审，而非训练记住编号 10。"
+  },
+  {
+    "question_id": 7535,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "cardinality",
+      "label_conflict"
+    ],
+    "evidence": "预测把对象名/属性名/关系名分别当成 IMG_OBJ、IMG_OBJ_ATT、IMG_REL 的列，遗漏三张类别字典表。预测使用复合对象键，gold 多处只按 IMG_ID 连接，可能产生同图其他对象的组合；不能从 gold 更宽的 JOIN 推断预测复合键错误。"
+  },
+  {
+    "question_id": 7559,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "predicate_semantics",
+      "schema_linking",
+      "projection_contract"
+    ],
+    "evidence": "evidence 已把 lowest 定义为 MIN(H)，预测却对 ATT_CLASS_ID 取最小值，并引入无关属性表，未按 H 排序取一项；额外输出对象类别 ID。这里主要是证据中排序目标没有落实。"
+  },
+  {
+    "question_id": 7511,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "entity_grounding",
+      "projection_contract",
+      "label_conflict"
+    ],
+    "evidence": "预测将完整短语 very large bike 当属性值，gold 只匹配 very large；又输出类名称而非 gold 的类 ID。问题中的 classes 没明确 ID/名称，需先查属性值、澄清输出约定，避免只按 gold 判断两个改动都属模型错误。"
+  },
+  {
+    "question_id": 7566,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "aggregation"
+    ],
+    "evidence": "AVG(OBJ_SAMPLE_ID) 是样本编号的平均数，题目要每图样本数，gold 是 COUNT(samples)/COUNT(DISTINCT images)。这是把 average 机械映射 AVG 而未辨别分子分母及统计单位。"
+  },
+  {
+    "question_id": 7518,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "cardinality",
+      "verifier_capped"
+    ],
+    "evidence": "预测额外按 IMG_ID 连接 IMG_OBJ_ATT，带来可能的行数乘法，题目并未要求属性；pred/gold 均在存档中达到 10000 行，strict reason=truncated。需在充分的资源上单独复核完整结果，不把截断集合比较作为语义结论。"
+  },
+  {
+    "question_id": 1403,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "identifier_scope",
+      "evidence_conflict",
+      "label_conflict"
+    ],
+    "evidence": "COUNT(DISTINCT PATIENT) 中 PATIENT 在两张表都存在，需明确来源；其余连接和描述条件与 gold 相同。但问题要求 after immunization，gold 和预测都没有比较日期，evidence 也未解释该时间限制。修别名可对齐 gold，不证明完整满足题意。"
+  },
+  {
+    "question_id": 1492,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "aggregation",
+      "cardinality"
+    ],
+    "evidence": "同一层 AVG(COUNT(*)) 导致聚合误用，子查询按患者分组而没有年份统计；目标涉及每年记录/人数，gold 采用总记录数除以不同年份数。构造训练题需明确平均的分母和每年是否去重患者。"
+  },
+  {
+    "question_id": 1457,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "schema_linking",
+      "identifier_scope"
+    ],
+    "evidence": "用 allergies 表筛选药物需求，并引用 FROM 中不存在的 encounters.ID；需查询 medications 与 patients 的关系。不能看到 no such column 就仅补 encounters JOIN，那仍会保留过敏记录与用药记录的语义混淆。"
+  },
+  {
+    "question_id": 7561,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "verifier_capped"
+    ],
+    "evidence": "两条 SQL 的差别是 COUNT(OBJ_SAMPLE_ID) 与 COUNT(IMG_ID)，schema 中两列均 NOT NULL，因此此聚合筛选等价。strict 未通过是 reason=truncated，pred/gold 都截为 10000 行；不能归类为重复行错误或 reward hacking。"
+  },
+  {
+    "question_id": 1509,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "cardinality"
+    ],
+    "evidence": "预测保留每份 careplan 的 START，gold 做 DISTINCT，导致相同日期重复次数不同；官方集合比较通过。题目是否要求唯一日期并不明确，不能仅凭该口径差异认定模型语义错误或奖励投机。"
+  },
+  {
+    "question_id": 7376,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "cardinality"
+    ],
+    "evidence": "预测保留所有并列最轻产品，gold LIMIT 1 仅取一个，存档两行与一行的数值集合相同。问题未定义并列规则；这是 tie handling/重复次数差异，不是已证实的 reward hacking。"
+  },
+  {
+    "question_id": 7513,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "cardinality"
+    ],
+    "evidence": "IN 子查询筛类别表会输出各类别行一次，gold 联表保留属性在图片中的重复出现；集合相同，行数不同。题目 all corresponding classes 没要求出现次数，不能认定保留重复的 gold 必然更符合语义。"
+  },
+  {
+    "question_id": 1436,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "cardinality",
+      "predicate_semantics"
+    ],
+    "evidence": "预测缺 DISTINCT，重复地址多于 gold；另日期闭区间字符串和 LIKE 年份的边界行为并非普遍等价，尽管当前存档集合相同。需要带年底时间戳与重复地址的反例验证，不能把本库命中当作通用等价。"
+  },
+  {
+    "question_id": 7393,
+    "reviewer": "codex",
+    "review_method": "question_evidence_sql_and_archived_execution; selected schema inspection; no repair rerun",
+    "labels": [
+      "cardinality",
+      "label_conflict",
+      "evidence_conflict"
+    ],
+    "evidence": "预测列出所有符合条件员工的 PersonType，gold 分组后只取出现最多的一类；目前集合碰巧相同。题目日期为 2008，evidence 却写 2010，gold 非补零日期字符串也需核验。不能将该题当作纯粹漏 DISTINCT 的训练目标。"
+  }
+]

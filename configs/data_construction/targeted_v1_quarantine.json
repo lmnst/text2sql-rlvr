@@ -1,0 +1,7 @@
+[
+  {"source_question_id": 5367, "db_id": "sales", "reason": "问题和 evidence 要最低价格，gold 却用 MAX(Price)。不作为本批构造来源。", "reviewer": "codex", "status": "excluded_source"},
+  {"source_question_id": 7987, "db_id": "university", "reason": "问题是至少 80000，evidence 写 >8000，gold 写 >80000；阈值和边界约定冲突。", "reviewer": "codex", "status": "excluded_source"},
+  {"source_question_id": 7919, "db_id": "music_platform_2", "reason": "问题要百分比，gold 只统计播客数量；evidence 的 >4 还与至少四类不一致。", "reviewer": "codex", "status": "excluded_source"},
+  {"source_question_id": 7821, "db_id": "world", "reason": "问题要指定地区城市人口的平均值，gold 按单个城市 ID 分组，改变统计粒度。", "reviewer": "codex", "status": "excluded_source"},
+  {"source_question_id": 2349, "db_id": "superstore", "reason": "问题按订单判断产品种类数量，gold 却按产品 ID 分组，并输出非分组订单 ID。", "reviewer": "codex", "status": "excluded_source"}
+]

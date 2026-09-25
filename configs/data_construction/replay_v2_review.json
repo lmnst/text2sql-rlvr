@@ -1,0 +1,1128 @@
+{
+  "seed": 0,
+  "n_replay": 150,
+  "selection": "database round-robin; seed-0 stable hash within database after audit",
+  "policy": "original question, evidence and gold unchanged; no target source IDs; no exact SQL/question duplicates",
+  "reviewed_candidates": [
+    {
+      "question_id": 8933,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "男性员工阈值严格 >70000；SUBSTR/REPLACE 后 CAST 处理 salary 的货币前缀和逗号，输出 ssn。需抽查原始金额格式。"
+    },
+    {
+      "question_id": 8938,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8939,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8943,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8946,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8947,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "Trainee 连接职位表，金额清洗后严格 >20000；原问题 &20,000 是符号笔误，金额数值无歧义。"
+    },
+    {
+      "question_id": 8950,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8951,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8952,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 8954,
+      "db_id": "human_resources",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对员工/职位/办公地点的字段归属；名称定位、性别条件与数量口径一致。金额题保留原货币清洗，需执行验证存储格式。"
+    },
+    {
+      "question_id": 7989,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 7990,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 7997,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8000,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8002,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8011,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8013,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8014,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8015,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 8017,
+      "db_id": "university",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对国家/学校/排名标准的外键关系与题面指定年份；仅保留输出和阈值明确的原题。"
+    },
+    {
+      "question_id": 5912,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5918,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5920,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5921,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5922,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5928,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5929,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5932,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5933,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5936,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5939,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5945,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 5953,
+      "db_id": "books",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对书、语言、作者、出版社或客户实体；计数按对应实体表或主键关联，保留原题列要求。"
+    },
+    {
+      "question_id": 7827,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7829,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7831,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7841,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7843,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7844,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7845,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7846,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7848,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 7853,
+      "db_id": "world",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Country/City/CountryLanguage 对应实体及题面国家、区域、人口筛选；不使用已发现的首都连接或布尔 COUNT 错误题。"
+    },
+    {
+      "question_id": 5582,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5584,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5586,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5587,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5589,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5594,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5595,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5596,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5598,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5599,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5600,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5601,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 5603,
+      "db_id": "shipping",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对客户、司机和目的地角色，日期与编号条件一致；计数按 shipment 主键，名称题输出对应姓名字段。"
+    },
+    {
+      "question_id": 1549,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1552,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1558,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "按 evidence 的 quantityOrdered<30 在明细层筛选，用 COUNT(DISTINCT orderNumber) 统计当年至少有一条符合条件明细的订单。"
+    },
+    {
+      "question_id": 1564,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1565,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1571,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1574,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1584,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 1597,
+      "db_id": "car_retails",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对办公室城市与客户/员工实体、付款和销售代表关系；不使用把订单总价当明细价或把订单数当明细数的题。"
+    },
+    {
+      "question_id": 5366,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5368,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5369,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5372,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5373,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5375,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5376,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5377,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5378,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5379,
+      "db_id": "sales",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对产品名、客户名和销售人员名的所属表；以 SalesID 为计数单位或按要求 DISTINCT 输出，避免客户计数重复。"
+    },
+    {
+      "question_id": 5838,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5843,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5853,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5855,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5857,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5873,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5877,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5878,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5882,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5883,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5884,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5885,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "按 flight number 筛选所有航班记录并返回每条的 DEST；题面未要求 distinct，保留重复。"
+    },
+    {
+      "question_id": 5886,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5887,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5888,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5891,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5893,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对机场/承运商编码以及出发、目的地角色，取消或延误定义按原 evidence；保留原始日期格式。"
+    },
+    {
+      "question_id": 5894,
+      "db_id": "airline",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "题面要求 all flights arriving at Miami，对每条航班返回承运商描述，保留重复。"
+    },
+    {
+      "question_id": 7923,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7928,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7932,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7935,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7937,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7938,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7939,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7944,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7948,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 7949,
+      "db_id": "music_platform_2",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 podcast.title 与 reviews.title 的归属、类别、评分和日期条件；保留 review 内容及题面请求的列，拒绝遗漏内容的原题。"
+    },
+    {
+      "question_id": 970,
+      "db_id": "computer_student",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 course 与 taughtBy 的桥接以及 advisedBy 的方向；保留课程级别的原始明确映射，拒绝把 OR 当 AND 或选错导师 ID 的原题。"
+    },
+    {
+      "question_id": 975,
+      "db_id": "computer_student",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 course 与 taughtBy 的桥接以及 advisedBy 的方向；保留课程级别的原始明确映射，拒绝把 OR 当 AND 或选错导师 ID 的原题。"
+    },
+    {
+      "question_id": 976,
+      "db_id": "computer_student",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 course 与 taughtBy 的桥接以及 advisedBy 的方向；保留课程级别的原始明确映射，拒绝把 OR 当 AND 或选错导师 ID 的原题。"
+    },
+    {
+      "question_id": 977,
+      "db_id": "computer_student",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 course 与 taughtBy 的桥接以及 advisedBy 的方向；保留课程级别的原始明确映射，拒绝把 OR 当 AND 或选错导师 ID 的原题。"
+    },
+    {
+      "question_id": 981,
+      "db_id": "computer_student",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 course 与 taughtBy 的桥接以及 advisedBy 的方向；保留课程级别的原始明确映射，拒绝把 OR 当 AND 或选错导师 ID 的原题。"
+    },
+    {
+      "question_id": 984,
+      "db_id": "computer_student",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 course 与 taughtBy 的桥接以及 advisedBy 的方向；保留课程级别的原始明确映射，拒绝把 OR 当 AND 或选错导师 ID 的原题。"
+    },
+    {
+      "question_id": 8510,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8511,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8513,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "Mailings1_2 表代表第一批 mailing；需确认行数为60000且 REFID 主键唯一，避免把缺少显式 LIMIT 当作默认成立。"
+    },
+    {
+      "question_id": 8514,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8516,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "Mailings1_2 与 Customers 按主键连接后筛 female、true；需核对 mailing 表确实对应第一批60000。"
+    },
+    {
+      "question_id": 8517,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8518,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8522,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "Mailings1_2 按客户唯一连接，地区 INHABITANTS_K>30；需核对第一批60000表范围。"
+    },
+    {
+      "question_id": 8523,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "Mailings1_2 按客户唯一连接，Male、Divorced、true 同时成立；需核对第一批60000。"
+    },
+    {
+      "question_id": 8527,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "按13至19岁含边界和true筛选唯一客户；需核对第一批60000表范围。"
+    },
+    {
+      "question_id": 8530,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8531,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 8532,
+      "db_id": "software_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 Customers 主键、Mailings1_2 的一客一行关系、Demog 千人单位与筛选条件；涉及第一批客户的题须另核对 mailing 表范围。"
+    },
+    {
+      "question_id": 173,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 175,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 181,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 186,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 187,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 188,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 191,
+      "db_id": "book_publishing_company",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对标题、员工、出版社和职位字段及年份筛选；保留原题排序；排除 CEO/CFO 混淆和错误 royalty 条件。"
+    },
+    {
+      "question_id": 2249,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "仅选择字段和集合请求明确的原题；不把评分行数当用户/电影数；电影计数需独立验证每个电影只贡献一次。"
+    },
+    {
+      "question_id": 2259,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "仅选择字段和集合请求明确的原题；不把评分行数当用户/电影数；电影计数需独立验证每个电影只贡献一次。"
+    },
+    {
+      "question_id": 2263,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "仅选择字段和集合请求明确的原题；不把评分行数当用户/电影数；电影计数需独立验证每个电影只贡献一次。"
+    },
+    {
+      "question_id": 2266,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "仅选择字段和集合请求明确的原题；不把评分行数当用户/电影数；电影计数需独立验证每个电影只贡献一次。"
+    },
+    {
+      "question_id": 2270,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "仅选择字段和集合请求明确的原题；不把评分行数当用户/电影数；电影计数需独立验证每个电影只贡献一次。"
+    },
+    {
+      "question_id": 2276,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "仅选择字段和集合请求明确的原题；不把评分行数当用户/电影数；电影计数需独立验证每个电影只贡献一次。"
+    },
+    {
+      "question_id": 2277,
+      "db_id": "movielens",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "按 USA、isEnglish=F、Action 筛选；需用 COUNT(DISTINCT movieid) 复核原 COUNT 没有重复计数。"
+    },
+    {
+      "question_id": 1670,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1673,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1674,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1676,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1677,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1679,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1681,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1682,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1684,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1686,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1687,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 1688,
+      "db_id": "restaurant",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对 restaurant ID 与城市/县/地区的关联及街道地址字段；拒绝把不存在某菜系误写成普通不等筛选的原题。"
+    },
+    {
+      "question_id": 855,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 856,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 860,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 861,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 862,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 863,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "course_id 在 registration 外层，内层 student 子查询中的 course_id 是相关引用；不是不存在的 student 字段。需用显式三表 JOIN COUNT 复核。"
+    },
+    {
+      "question_id": 864,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 865,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "原 evidence 明确 NULL grade 表示不及格，因此 IS NULL 与题意一致，不当作一般缺失值随意解释。"
+    },
+    {
+      "question_id": 868,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 872,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 873,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    },
+    {
+      "question_id": 874,
+      "db_id": "cs_semester",
+      "reviewer": "codex",
+      "semantic_review": "provisionally_accepted_pending_execution",
+      "note": "核对学生、教授、课程及 registration/RA 角色；成绩、能力档位按明确 evidence；姓名分列和数量单位遵循原题。"
+    }
+  ]
+}

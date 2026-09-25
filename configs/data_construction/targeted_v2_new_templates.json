@@ -1,0 +1,866 @@
+[
+  {
+    "template_id": "E11",
+    "family": "entity_matching",
+    "db_id": "computer_student",
+    "source_question_ids": [
+      968,
+      969
+    ],
+    "slots_sql": "SELECT c.course_id FROM course c WHERE EXISTS(SELECT 1 FROM taughtBy t WHERE t.course_id=c.course_id) ORDER BY c.course_id LIMIT 24",
+    "slot_names": [
+      "course"
+    ],
+    "witness_sql": "SELECT t.p_id,c.courseLevel FROM taughtBy t JOIN course c ON c.course_id=t.course_id WHERE t.course_id={sql_course}",
+    "focus": "同一课程，任课人员 ID 来自 taughtBy，课程级别来自 course；分别选择对应实体字段。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For course ID {course}, list the distinct IDs of people recorded as its instructors.",
+        "sql": "SELECT DISTINCT p_id FROM taughtBy WHERE course_id={sql_course}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": true
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For course ID {course}, return its course level once.",
+        "sql": "SELECT courseLevel FROM course WHERE course_id={sql_course}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            1
+          ],
+          "distinct": true
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "E12",
+    "family": "entity_matching",
+    "db_id": "cs_semester",
+    "source_question_ids": [
+      857
+    ],
+    "slots_sql": "SELECT f_name,l_name FROM student WHERE phone_number IS NOT NULL AND email IS NOT NULL ORDER BY student_id LIMIT 24",
+    "slot_names": [
+      "first",
+      "last"
+    ],
+    "witness_sql": "SELECT phone_number,email FROM student WHERE f_name={sql_first} AND l_name={sql_last}",
+    "focus": "按学生 first/last 匹配实体，电话与邮箱为不同字段；不拿人名匹配 student_id。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "Return the phone number for the student named {first} {last}.",
+        "sql": "SELECT phone_number FROM student WHERE f_name={sql_first} AND l_name={sql_last}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "Return the email address for the student named {first} {last}.",
+        "sql": "SELECT email FROM student WHERE f_name={sql_first} AND l_name={sql_last}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            1
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "E13",
+    "family": "entity_matching",
+    "db_id": "cs_semester",
+    "source_question_ids": [
+      859
+    ],
+    "slots_sql": "SELECT s.f_name,s.l_name FROM student s WHERE EXISTS(SELECT 1 FROM RA r WHERE r.student_id=s.student_id) ORDER BY s.student_id LIMIT 24",
+    "slot_names": [
+      "first",
+      "last"
+    ],
+    "witness_sql": "SELECT s.f_name,s.l_name,p.first_name,p.last_name FROM student s JOIN RA r ON r.student_id=s.student_id JOIN prof p ON p.prof_id=r.prof_id WHERE s.f_name={sql_first} AND s.l_name={sql_last}",
+    "focus": "RA 连接学生和教授；二者姓名字段命名不同，一题输出学生姓名，另一题输出其导师姓名。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "Return the first and last names of the student {first} {last} as two columns, once.",
+        "sql": "SELECT f_name,l_name FROM student WHERE f_name={sql_first} AND l_name={sql_last}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0,
+            1
+          ],
+          "distinct": true
+        }
+      },
+      {
+        "variant": "b",
+        "question": "Return the distinct first and last names, as two columns, of professors supervising {first} {last} as a research assistant.",
+        "sql": "SELECT DISTINCT p.first_name,p.last_name FROM prof p JOIN RA r ON r.prof_id=p.prof_id JOIN student s ON s.student_id=r.student_id WHERE s.f_name={sql_first} AND s.l_name={sql_last}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            2,
+            3
+          ],
+          "distinct": true
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "E14",
+    "family": "entity_matching",
+    "db_id": "book_publishing_company",
+    "source_question_ids": [
+      169
+    ],
+    "slots_sql": "SELECT t.title FROM titles t WHERE EXISTS(SELECT 1 FROM titleauthor a WHERE a.title_id=t.title_id) ORDER BY t.title_id LIMIT 24",
+    "slot_names": [
+      "title"
+    ],
+    "witness_sql": "SELECT p.pub_name,a.au_fname,a.au_lname FROM titles t JOIN publishers p ON p.pub_id=t.pub_id JOIN titleauthor ta ON ta.title_id=t.title_id JOIN authors a ON a.au_id=ta.au_id WHERE t.title={sql_title}",
+    "focus": "同一本书，出版机构与作者不是同一实体；作者需经 titleauthor 连接。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For the title '{title}', list distinct publisher names.",
+        "sql": "SELECT DISTINCT p.pub_name FROM titles t JOIN publishers p ON p.pub_id=t.pub_id WHERE t.title={sql_title}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": true
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For the title '{title}', list distinct author first and last names as two columns.",
+        "sql": "SELECT DISTINCT a.au_fname,a.au_lname FROM titles t JOIN titleauthor ta ON ta.title_id=t.title_id JOIN authors a ON a.au_id=ta.au_id WHERE t.title={sql_title}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            1,
+            2
+          ],
+          "distinct": true
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "E15",
+    "family": "entity_matching",
+    "db_id": "restaurant",
+    "source_question_ids": [
+      1672,
+      1675
+    ],
+    "slots_sql": "SELECT g.id_restaurant FROM generalinfo g JOIN geographic geo ON geo.city=g.city WHERE g.food_type IS NOT NULL AND geo.region IS NOT NULL ORDER BY g.id_restaurant LIMIT 24",
+    "slot_names": [
+      "id"
+    ],
+    "witness_sql": "SELECT g.food_type,geo.region FROM generalinfo g JOIN geographic geo ON geo.city=g.city WHERE g.id_restaurant={sql_id}",
+    "focus": "菜系在 generalinfo，地区在 geographic；不能从餐厅表直接读取 region。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For restaurant ID {id}, return its food type.",
+        "sql": "SELECT food_type FROM generalinfo WHERE id_restaurant={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For restaurant ID {id}, return the geographic region of its city.",
+        "sql": "SELECT geo.region FROM generalinfo g JOIN geographic geo ON geo.city=g.city WHERE g.id_restaurant={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            1
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "E16",
+    "family": "entity_matching",
+    "db_id": "craftbeer",
+    "source_question_ids": [
+      8858
+    ],
+    "slots_sql": "SELECT id FROM beers ORDER BY id LIMIT 24",
+    "slot_names": [
+      "id"
+    ],
+    "witness_sql": "SELECT b.name,br.name FROM beers b JOIN breweries br ON br.id=b.brewery_id WHERE b.id={sql_id}",
+    "focus": "两张表都有 name 和 id；啤酒名与酿酒厂名通过 brewery_id 连接后各取正确表的 name。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For beer ID {id}, return the beer name.",
+        "sql": "SELECT name FROM beers WHERE id={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For beer ID {id}, return the name of its brewery.",
+        "sql": "SELECT br.name FROM beers b JOIN breweries br ON br.id=b.brewery_id WHERE b.id={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            1
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "E17",
+    "family": "entity_matching",
+    "db_id": "software_company",
+    "source_question_ids": [
+      8512
+    ],
+    "slots_sql": "SELECT c.ID FROM Customers c JOIN Demog d ON d.GEOID=c.GEOID WHERE c.OCCUPATION IS NOT NULL AND d.INCOME_K IS NOT NULL ORDER BY c.ID LIMIT 24",
+    "slot_names": [
+      "id"
+    ],
+    "witness_sql": "SELECT c.OCCUPATION,d.INCOME_K FROM Customers c JOIN Demog d ON d.GEOID=c.GEOID WHERE c.ID={sql_id}",
+    "focus": "职业是客户字段，地区收入是 Demog 字段；按客户 ID 定位，通过 GEOID 取地区信息。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For customer ID {id}, return the customer's occupation.",
+        "sql": "SELECT OCCUPATION FROM Customers WHERE ID={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For customer ID {id}, return the INCOME_K value recorded for the customer's geographic area.",
+        "sql": "SELECT d.INCOME_K FROM Customers c JOIN Demog d ON d.GEOID=c.GEOID WHERE c.ID={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            1
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A11",
+    "family": "aggregation_level",
+    "db_id": "computer_student",
+    "source_question_ids": [
+      968
+    ],
+    "slots_sql": "SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6",
+    "slot_names": [
+      "threshold"
+    ],
+    "witness_sql": "SELECT p_id FROM taughtBy",
+    "focus": "按任课人员统计课程数，再区分列举合格人员与计数；主键确保同一人员同一课程一行。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "List IDs of instructors assigned more than {threshold} courses, once per instructor.",
+        "sql": "SELECT p_id FROM taughtBy GROUP BY p_id HAVING COUNT(*)>{sql_threshold}",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "keys"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "How many instructors are assigned more than {threshold} courses?",
+        "sql": "SELECT COUNT(*) FROM (SELECT p_id FROM taughtBy GROUP BY p_id HAVING COUNT(*)>{sql_threshold}) q",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "count_groups"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A12",
+    "family": "aggregation_level",
+    "db_id": "cs_semester",
+    "source_question_ids": [
+      859
+    ],
+    "slots_sql": "SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6",
+    "slot_names": [
+      "threshold"
+    ],
+    "witness_sql": "SELECT prof_id FROM RA",
+    "focus": "RA 按教授分组；合格教授人数与其指导关系记录总数不同，同一学生可与多位教授形成关系。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "How many professors supervise more than {threshold} research assistants?",
+        "sql": "SELECT COUNT(*) FROM (SELECT prof_id FROM RA GROUP BY prof_id HAVING COUNT(*)>{sql_threshold}) q",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "count_groups"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "How many research-assistant supervision records belong to professors who each supervise more than {threshold} research assistants? Count records, not distinct students across professors.",
+        "sql": "SELECT COUNT(*) FROM RA WHERE prof_id IN (SELECT prof_id FROM RA GROUP BY prof_id HAVING COUNT(*)>{sql_threshold})",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "sum_sizes"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A13",
+    "family": "aggregation_level",
+    "db_id": "book_publishing_company",
+    "source_question_ids": [
+      167
+    ],
+    "slots_sql": "SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6",
+    "slot_names": [
+      "threshold"
+    ],
+    "witness_sql": "SELECT stor_id FROM sales",
+    "focus": "明确统计 sales 行而非订单数或 qty 总和，按书店分组后再计数。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "List store IDs with more than {threshold} sales records, once per store. A sales record is one row of sales.",
+        "sql": "SELECT stor_id FROM sales GROUP BY stor_id HAVING COUNT(*)>{sql_threshold}",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "keys"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "How many stores have more than {threshold} sales records? A sales record is one row of sales.",
+        "sql": "SELECT COUNT(*) FROM (SELECT stor_id FROM sales GROUP BY stor_id HAVING COUNT(*)>{sql_threshold}) q",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "count_groups"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A14",
+    "family": "aggregation_level",
+    "db_id": "restaurant",
+    "source_question_ids": [
+      1672
+    ],
+    "slots_sql": "SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 10 UNION ALL SELECT 15",
+    "slot_names": [
+      "threshold"
+    ],
+    "witness_sql": "SELECT city FROM generalinfo WHERE city IS NOT NULL",
+    "focus": "餐厅数先按非空城市分组；城市数与合格城市中的餐厅总数是不同统计单位。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "How many cities have more than {threshold} restaurants recorded in generalinfo? Exclude unknown cities.",
+        "sql": "SELECT COUNT(*) FROM (SELECT city FROM generalinfo WHERE city IS NOT NULL GROUP BY city HAVING COUNT(*)>{sql_threshold}) q",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "count_groups"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "How many restaurants in total are in cities that each have more than {threshold} recorded restaurants? Exclude unknown cities.",
+        "sql": "SELECT COUNT(*) FROM generalinfo WHERE city IN (SELECT city FROM generalinfo WHERE city IS NOT NULL GROUP BY city HAVING COUNT(*)>{sql_threshold})",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "sum_sizes"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A15",
+    "family": "aggregation_level",
+    "db_id": "craftbeer",
+    "source_question_ids": [
+      8858
+    ],
+    "slots_sql": "SELECT style FROM beers WHERE abv IS NOT NULL GROUP BY style HAVING COUNT(DISTINCT brewery_id)>2 AND COUNT(*)>10 ORDER BY style LIMIT 24",
+    "slot_names": [
+      "style"
+    ],
+    "witness_sql": "SELECT brewery_id,abv FROM beers WHERE abv IS NOT NULL AND style={sql_style}",
+    "focus": "按酒厂平均 ABV 再等权平均与逐啤酒平均，排除 NULL，不能错误赋予大酒厂相同或不同权重。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For beers of style '{style}' with known ABV, compute mean ABV per brewery, then return the unweighted mean of the brewery means.",
+        "sql": "SELECT AVG(m) FROM (SELECT AVG(abv) m FROM beers WHERE abv IS NOT NULL AND style={sql_style} GROUP BY brewery_id) q",
+        "reference": {
+          "kind": "mean",
+          "key": 0,
+          "value": 1,
+          "mode": "group_means"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For beers of style '{style}' with known ABV, return the mean ABV across individual beer records, weighting each beer equally.",
+        "sql": "SELECT AVG(abv) FROM beers WHERE abv IS NOT NULL AND style={sql_style}",
+        "reference": {
+          "kind": "mean",
+          "key": 0,
+          "value": 1,
+          "mode": "rows"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A16",
+    "family": "aggregation_level",
+    "db_id": "software_company",
+    "source_question_ids": [
+      8512
+    ],
+    "slots_sql": "SELECT 100 UNION ALL SELECT 200 UNION ALL SELECT 300 UNION ALL SELECT 400 UNION ALL SELECT 500 UNION ALL SELECT 600",
+    "slot_names": [
+      "threshold"
+    ],
+    "witness_sql": "SELECT OCCUPATION FROM Customers WHERE OCCUPATION IS NOT NULL AND ID BETWEEN 1 AND 5000",
+    "focus": "职业类别数与类别内客户人数分开，非空职业分类条件一致。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "How many non-null occupations each have more than {threshold} customers? Consider only customer IDs 1 through 5000 inclusive.",
+        "sql": "SELECT COUNT(*) FROM (SELECT OCCUPATION FROM Customers WHERE OCCUPATION IS NOT NULL AND ID BETWEEN 1 AND 5000 GROUP BY OCCUPATION HAVING COUNT(*)>{sql_threshold}) q",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "count_groups"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "How many customers in total belong to non-null occupations that each have more than {threshold} customers? Consider only customer IDs 1 through 5000 inclusive.",
+        "sql": "SELECT COUNT(*) FROM Customers WHERE ID BETWEEN 1 AND 5000 AND OCCUPATION IN (SELECT OCCUPATION FROM Customers WHERE OCCUPATION IS NOT NULL AND ID BETWEEN 1 AND 5000 GROUP BY OCCUPATION HAVING COUNT(*)>{sql_threshold})",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": "{threshold}",
+          "mode": "sum_sizes"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "A17",
+    "family": "aggregation_level",
+    "db_id": "movielens",
+    "source_question_ids": [
+      2247
+    ],
+    "slots_sql": "SELECT 50 UNION ALL SELECT 100 UNION ALL SELECT 150 UNION ALL SELECT 200 UNION ALL SELECT 250 UNION ALL SELECT 300",
+    "slot_names": [
+      "upper"
+    ],
+    "witness_sql": "SELECT movieid FROM u2base WHERE userid BETWEEN 1 AND {sql_upper}",
+    "focus": "先限定评分用户范围，再按电影统计评分记录，列出电影与统计电影数量不同；不读取评分数值格式。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "Among ratings by user IDs 1 through {upper} inclusive, list movie IDs with more than ten rating records, once per movie.",
+        "sql": "SELECT movieid FROM u2base WHERE userid BETWEEN 1 AND {sql_upper} GROUP BY movieid HAVING COUNT(*)>10",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": 10,
+          "mode": "keys"
+        }
+      },
+      {
+        "variant": "b",
+        "question": "Among ratings by user IDs 1 through {upper} inclusive, how many movies have more than ten rating records?",
+        "sql": "SELECT COUNT(*) FROM (SELECT movieid FROM u2base WHERE userid BETWEEN 1 AND {sql_upper} GROUP BY movieid HAVING COUNT(*)>10) q",
+        "reference": {
+          "kind": "group_counts",
+          "key": 0,
+          "threshold": 10,
+          "mode": "count_groups"
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "O11",
+    "family": "output_contract",
+    "db_id": "computer_student",
+    "source_question_ids": [
+      968,
+      969
+    ],
+    "slots_sql": "SELECT DISTINCT c.courseLevel,v.upper_id FROM course c CROSS JOIN (SELECT 1000 upper_id UNION ALL SELECT 200 UNION ALL SELECT 100) v WHERE c.courseLevel IS NOT NULL ORDER BY v.upper_id DESC,c.courseLevel",
+    "slot_names": [
+      "level",
+      "upper"
+    ],
+    "witness_sql": "SELECT t.p_id FROM taughtBy t JOIN course c ON c.course_id=t.course_id WHERE c.courseLevel={sql_level} AND t.p_id<={sql_upper}",
+    "focus": "同一级别的任课记录，保留一门课一名教师一行，或按教师去重。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For courses at level {level}, return one instructor ID per teaching assignment, preserving repeated instructor IDs. Only include instructor IDs at most {upper}.",
+        "sql": "SELECT t.p_id FROM taughtBy t JOIN course c ON c.course_id=t.course_id WHERE c.courseLevel={sql_level} AND t.p_id<={sql_upper}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For courses at level {level}, return each instructor ID only once. Only include instructor IDs at most {upper}.",
+        "sql": "SELECT DISTINCT t.p_id FROM taughtBy t JOIN course c ON c.course_id=t.course_id WHERE c.courseLevel={sql_level} AND t.p_id<={sql_upper}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": true
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "O12",
+    "family": "output_contract",
+    "db_id": "cs_semester",
+    "source_question_ids": [
+      857
+    ],
+    "slots_sql": "SELECT student_id FROM student WHERE f_name IS NOT NULL AND l_name IS NOT NULL ORDER BY student_id LIMIT 24",
+    "slot_names": [
+      "id"
+    ],
+    "witness_sql": "SELECT f_name,l_name FROM student WHERE student_id={sql_id}",
+    "focus": "固定学生 ID，输出 first/last 两列或空格拼接一列，SQLite 使用 ||。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For student ID {id}, return first name and last name as two columns.",
+        "sql": "SELECT f_name,l_name FROM student WHERE student_id={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0,
+            1
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For student ID {id}, return one full-name column consisting of first name, a space, and last name.",
+        "sql": "SELECT f_name||' '||l_name FROM student WHERE student_id={sql_id}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            {
+              "concat": [
+                0,
+                1
+              ],
+              "separator": " "
+            }
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "O13",
+    "family": "output_contract",
+    "db_id": "book_publishing_company",
+    "source_question_ids": [
+      169
+    ],
+    "slots_sql": "SELECT DISTINCT type FROM titles WHERE type IS NOT NULL ORDER BY type LIMIT 24",
+    "slot_names": [
+      "type"
+    ],
+    "witness_sql": "SELECT title,price FROM titles WHERE type={sql_type}",
+    "focus": "同一类型的书保留每书一行，只改变是否额外返回价格；保留 NULL 价格。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For titles of type '{type}', return the title text only, one row per title record.",
+        "sql": "SELECT title FROM titles WHERE type={sql_type}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For titles of type '{type}', return title text and price as two columns, one row per title record; retain null prices.",
+        "sql": "SELECT title,price FROM titles WHERE type={sql_type}",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0,
+            1
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "O14",
+    "family": "output_contract",
+    "db_id": "restaurant",
+    "source_question_ids": [
+      1672
+    ],
+    "slots_sql": "SELECT food_type FROM generalinfo WHERE food_type IS NOT NULL AND city IS NOT NULL GROUP BY food_type HAVING COUNT(*)>COUNT(DISTINCT city) ORDER BY food_type LIMIT 24",
+    "slot_names": [
+      "food"
+    ],
+    "witness_sql": "SELECT city FROM generalinfo WHERE food_type={sql_food} AND city IS NOT NULL",
+    "focus": "同一菜系的已知城市，一餐厅一行或每城市一行，不能由集合相同判两题等价。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For restaurants serving '{food}' food with a known city, return one city per restaurant, preserving repeated cities.",
+        "sql": "SELECT city FROM generalinfo WHERE food_type={sql_food} AND city IS NOT NULL",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For restaurants serving '{food}' food with a known city, list each city once.",
+        "sql": "SELECT DISTINCT city FROM generalinfo WHERE food_type={sql_food} AND city IS NOT NULL",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": true
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "O15",
+    "family": "output_contract",
+    "db_id": "craftbeer",
+    "source_question_ids": [
+      8858
+    ],
+    "slots_sql": "SELECT br.name FROM breweries br JOIN beers b ON b.brewery_id=br.id WHERE b.ibu IS NOT NULL AND b.abv IS NOT NULL GROUP BY br.id,br.name ORDER BY br.id LIMIT 24",
+    "slot_names": [
+      "brewery"
+    ],
+    "witness_sql": "SELECT b.ibu,b.abv FROM beers b JOIN breweries br ON br.id=b.brewery_id WHERE br.name={sql_brewery} AND b.ibu IS NOT NULL AND b.abv IS NOT NULL",
+    "focus": "相同酒厂的啤酒，IBU 一列与 IBU/ABV 两列；共同排除指标缺失并保留一啤酒一行。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For beers from '{brewery}' with both IBU and ABV known, return only IBU, one row per beer.",
+        "sql": "SELECT b.ibu FROM beers b JOIN breweries br ON br.id=b.brewery_id WHERE br.name={sql_brewery} AND b.ibu IS NOT NULL AND b.abv IS NOT NULL",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For beers from '{brewery}' with both IBU and ABV known, return IBU and ABV in two columns, one row per beer.",
+        "sql": "SELECT b.ibu,b.abv FROM beers b JOIN breweries br ON br.id=b.brewery_id WHERE br.name={sql_brewery} AND b.ibu IS NOT NULL AND b.abv IS NOT NULL",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0,
+            1
+          ],
+          "distinct": false
+        }
+      }
+    ]
+  },
+  {
+    "template_id": "O16",
+    "family": "output_contract",
+    "db_id": "software_company",
+    "source_question_ids": [
+      8512
+    ],
+    "slots_sql": "SELECT OCCUPATION FROM Customers WHERE OCCUPATION IS NOT NULL AND age IS NOT NULL GROUP BY OCCUPATION HAVING COUNT(*)>COUNT(DISTINCT age) ORDER BY OCCUPATION LIMIT 24",
+    "slot_names": [
+      "occupation"
+    ],
+    "witness_sql": "SELECT age FROM Customers WHERE OCCUPATION={sql_occupation} AND age IS NOT NULL",
+    "focus": "同一职业客户，一客户一个年龄值或只列不同年龄，均明确不含 NULL。",
+    "evidence": "",
+    "reviewer": "codex",
+    "review_status": "template_semantic_reviewed",
+    "variants": [
+      {
+        "variant": "a",
+        "question": "For customers whose occupation is '{occupation}' and whose age is known, return one age per customer, preserving duplicates.",
+        "sql": "SELECT age FROM Customers WHERE OCCUPATION={sql_occupation} AND age IS NOT NULL",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": false
+        }
+      },
+      {
+        "variant": "b",
+        "question": "For customers whose occupation is '{occupation}' and whose age is known, list each distinct age once.",
+        "sql": "SELECT DISTINCT age FROM Customers WHERE OCCUPATION={sql_occupation} AND age IS NOT NULL",
+        "reference": {
+          "kind": "project",
+          "columns": [
+            0
+          ],
+          "distinct": true
+        }
+      }
+    ]
+  }
+]

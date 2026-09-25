@@ -1,0 +1,28 @@
+{
+  "experiment": "train_base_vs_best_sft_seed0_n512_linked_v1",
+  "train_questions": "data/processed/train_filtered.json",
+  "original_questions": "data/bird/train/train.json",
+  "split_manifest": "configs/splits/train_val.json",
+  "database_root": "data/bird/train/train_databases",
+  "output_dir": "results/analysis/train_base_vs_sft",
+  "n_samples": 512,
+  "seed": 0,
+  "sampling": "database_proportional_min_one_largest_remainder",
+  "schema_mode": "linked",
+  "prompt_config": {
+    "schema_style": "ddl",
+    "include_descriptions": false,
+    "include_evidence": true,
+    "sample_rows": 0,
+    "instruction_version": "v1"
+  },
+  "decoding": {"temperature": 0.0, "top_p": 1.0, "max_tokens": 512, "seed": 0, "thinking": false},
+  "execution": {"timeout_s": 10, "max_rows": 100000},
+  "arms": {
+    "base": {"served_model": "diagnosis-base", "checkpoint": "/root/autodl-tmp/Qwen3-1.7B"},
+    "sft": {"served_model": "diagnosis-sft", "checkpoint": "/root/autodl-tmp/Qwen3-1.7B-sft-strong-merged-f78ab16a"}
+  },
+  "sft_selection_evidence": "Existing strong SFT used by runs 74d4d83c087c and 3b9e91f891d8; do not select checkpoints on diagnosis results.",
+  "review_per_transition": 12,
+  "synthetic_data": false
+}

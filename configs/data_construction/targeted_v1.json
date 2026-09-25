@@ -1,0 +1,1317 @@
+{
+  "version": "targeted_sft_v1",
+  "seed": 0,
+  "source_questions": "data/processed/train_filtered.json",
+  "split_manifest": "configs/splits/train_val.json",
+  "database_root": "data/bird/train/train_databases",
+  "output_root": "data/targeted_sft/v1",
+  "prompt_schema": "full",
+  "include_evidence": true,
+  "timeout_s": 10,
+  "max_rows": 100000,
+  "quarantine_path": "configs/data_construction/targeted_v1_quarantine.json",
+  "pairs": [
+    {
+      "pair_id": "E01",
+      "family": "entity_matching",
+      "db_id": "human_resources",
+      "source_question_ids": [
+        8934,
+        8936,
+        8940
+      ],
+      "witness_sql": "SELECT e.firstname,e.lastname,p.positiontitle,l.locationcity FROM employee e JOIN position p ON e.positionID=p.positionID JOIN location l ON e.locationID=l.locationID",
+      "focus": "区分职位名称与办公城市，分别沿 positionID 与 locationID 找到名字字段。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List the first and last names, as two columns, of employees whose job title is Regional Manager. Keep one row per employee.",
+          "sql": "SELECT e.firstname,e.lastname FROM employee e JOIN position p ON e.positionID=p.positionID WHERE p.positiontitle='Regional Manager'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1
+            ],
+            "filter": [
+              [
+                2,
+                "eq",
+                "Regional Manager"
+              ]
+            ],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "List the first and last names, as two columns, of employees whose office city is New York City. Keep one row per employee.",
+          "sql": "SELECT e.firstname,e.lastname FROM employee e JOIN location l ON e.locationID=l.locationID WHERE l.locationcity='New York City'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1
+            ],
+            "filter": [
+              [
+                3,
+                "eq",
+                "New York City"
+              ]
+            ],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E02",
+      "family": "entity_matching",
+      "db_id": "university",
+      "source_question_ids": [
+        7988
+      ],
+      "witness_sql": "SELECT rc.criteria_name,rc.ranking_system_id,rs.system_name FROM ranking_criteria rc JOIN ranking_system rs ON rs.id=rc.ranking_system_id",
+      "focus": "同一 Award 条件下区分排名系统外键与系统名称，名称必须连接 ranking_system。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For the criterion named Award, return the ranking system ID only.",
+          "sql": "SELECT ranking_system_id FROM ranking_criteria WHERE criteria_name='Award'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [
+              [
+                0,
+                "eq",
+                "Award"
+              ]
+            ],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For the criterion named Award, return the ranking system name only.",
+          "sql": "SELECT rs.system_name FROM ranking_criteria rc JOIN ranking_system rs ON rs.id=rc.ranking_system_id WHERE rc.criteria_name='Award'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              2
+            ],
+            "filter": [
+              [
+                0,
+                "eq",
+                "Award"
+              ]
+            ],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E03",
+      "family": "entity_matching",
+      "db_id": "books",
+      "source_question_ids": [
+        5914,
+        5942
+      ],
+      "witness_sql": "SELECT b.title,p.publisher_name,a.author_name FROM book b JOIN publisher p ON p.publisher_id=b.publisher_id JOIN book_author ba ON ba.book_id=b.book_id JOIN author a ON a.author_id=ba.author_id WHERE b.title='The Illuminati'",
+      "focus": "书名绑定 book.title；出版社通过 publisher_id，作者通过 book_author 桥接，不把名称直接当 ID。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List the distinct publisher names of books titled The Illuminati.",
+          "sql": "SELECT DISTINCT p.publisher_name FROM book b JOIN publisher p ON p.publisher_id=b.publisher_id WHERE b.title='The Illuminati'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        },
+        {
+          "variant": "b",
+          "question": "List the distinct author names of books titled The Illuminati.",
+          "sql": "SELECT DISTINCT a.author_name FROM book b JOIN book_author ba ON ba.book_id=b.book_id JOIN author a ON a.author_id=ba.author_id WHERE b.title='The Illuminati'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              2
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E04",
+      "family": "entity_matching",
+      "db_id": "world",
+      "source_question_ids": [
+        7822
+      ],
+      "witness_sql": "SELECT co.Code,cl.Language,ci.Name FROM Country co JOIN CountryLanguage cl ON cl.CountryCode=co.Code JOIN City ci ON ci.ID=co.Capital WHERE co.Code='USA'",
+      "focus": "国家代码连接语言表；首都必须由 Capital 对应 City.ID，不能把该国任意城市当首都。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List the distinct languages recorded for the country with code USA.",
+          "sql": "SELECT Language FROM CountryLanguage WHERE CountryCode='USA'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        },
+        {
+          "variant": "b",
+          "question": "Return the name of the capital city of the country with code USA, once.",
+          "sql": "SELECT ci.Name FROM Country co JOIN City ci ON ci.ID=co.Capital WHERE co.Code='USA'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              2
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E05",
+      "family": "entity_matching",
+      "db_id": "shipping",
+      "source_question_ids": [
+        5581,
+        5591
+      ],
+      "witness_sql": "SELECT s.ship_id,c.state,ci.state FROM shipment s JOIN customer c ON c.cust_id=s.cust_id JOIN city ci ON ci.city_id=s.city_id",
+      "focus": "同为 Florida，customer.state 是 FL，目的地 city.state 是 Florida；实体与值编码都要匹配。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "Florida is encoded as FL in customer.state and Florida in city.state. shipment.city_id identifies the destination.",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List shipment IDs for shipments ordered by customers whose address is in Florida.",
+          "sql": "SELECT s.ship_id FROM shipment s JOIN customer c ON c.cust_id=s.cust_id WHERE c.state='FL'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [
+              [
+                1,
+                "eq",
+                "FL"
+              ]
+            ],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "List shipment IDs for shipments whose destination is in Florida.",
+          "sql": "SELECT s.ship_id FROM shipment s JOIN city ci ON ci.city_id=s.city_id WHERE ci.state='Florida'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [
+              [
+                2,
+                "eq",
+                "Florida"
+              ]
+            ],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E06",
+      "family": "entity_matching",
+      "db_id": "car_retails",
+      "source_question_ids": [
+        1548
+      ],
+      "witness_sql": "SELECT 'employee',e.employeeNumber,o.city FROM employees e JOIN offices o ON o.officeCode=e.officeCode UNION ALL SELECT 'customer',customerNumber,city FROM customers",
+      "focus": "员工办公城市在 offices，客户所在地在 customers；不能把同名 city 用在错误实体上。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List employee numbers for employees whose office is in Paris.",
+          "sql": "SELECT e.employeeNumber FROM employees e JOIN offices o ON o.officeCode=e.officeCode WHERE o.city='Paris'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [
+              [
+                0,
+                "eq",
+                "employee"
+              ],
+              [
+                2,
+                "eq",
+                "Paris"
+              ]
+            ],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "List customer numbers for customers whose address is in Paris.",
+          "sql": "SELECT customerNumber FROM customers WHERE city='Paris'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [
+              [
+                0,
+                "eq",
+                "customer"
+              ],
+              [
+                2,
+                "eq",
+                "Paris"
+              ]
+            ],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E07",
+      "family": "entity_matching",
+      "db_id": "sales",
+      "source_question_ids": [
+        5364
+      ],
+      "witness_sql": "SELECT s.SalesID,c.FirstName,c.LastName,e.FirstName,e.LastName FROM Sales s JOIN Customers c ON c.CustomerID=s.CustomerID JOIN Employees e ON e.EmployeeID=s.SalesPersonID WHERE s.SalesID BETWEEN 1 AND 10",
+      "focus": "相同姓名字段分属 Customers 与 Employees，销售人员外键为 SalesPersonID，不是 CustomerID。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For each sale with SalesID from 1 through 10 inclusive, return SalesID and the customer's first and last names as three columns.",
+          "sql": "SELECT s.SalesID,c.FirstName,c.LastName FROM Sales s JOIN Customers c ON c.CustomerID=s.CustomerID WHERE s.SalesID BETWEEN 1 AND 10",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1,
+              2
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For each sale with SalesID from 1 through 10 inclusive, return SalesID and the salesperson's first and last names as three columns.",
+          "sql": "SELECT s.SalesID,e.FirstName,e.LastName FROM Sales s JOIN Employees e ON e.EmployeeID=s.SalesPersonID WHERE s.SalesID BETWEEN 1 AND 10",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              3,
+              4
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E08",
+      "family": "entity_matching",
+      "db_id": "airline",
+      "source_question_ids": [
+        5821,
+        5824
+      ],
+      "witness_sql": "SELECT ao.Description,ad.Description FROM Airlines f JOIN Airports ao ON ao.Code=f.ORIGIN JOIN Airports ad ON ad.Code=f.DEST WHERE f.FL_DATE='2018/8/1'",
+      "focus": "同一 Airports 表扮演出发与到达两种角色，分别连接 ORIGIN 和 DEST。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "Flight dates are stored as YYYY/M/D, so August 1, 2018 is 2018/8/1.",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List the distinct descriptions of departure airports for flights on August 1, 2018.",
+          "sql": "SELECT DISTINCT a.Description FROM Airlines f JOIN Airports a ON a.Code=f.ORIGIN WHERE f.FL_DATE='2018/8/1'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        },
+        {
+          "variant": "b",
+          "question": "List the distinct descriptions of destination airports for flights on August 1, 2018.",
+          "sql": "SELECT DISTINCT a.Description FROM Airlines f JOIN Airports a ON a.Code=f.DEST WHERE f.FL_DATE='2018/8/1'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E09",
+      "family": "entity_matching",
+      "db_id": "music_platform_2",
+      "source_question_ids": [
+        7920
+      ],
+      "witness_sql": "SELECT podcast_id,itunes_id FROM podcasts WHERE title='Brown Suga Diaries'",
+      "focus": "内部 podcast_id 与外部 itunes_id 都是 ID，但语义不同；按标题定位后选正确字段。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For the podcast titled Brown Suga Diaries, return its internal podcast ID only.",
+          "sql": "SELECT podcast_id FROM podcasts WHERE title='Brown Suga Diaries'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For the podcast titled Brown Suga Diaries, return its iTunes ID only.",
+          "sql": "SELECT itunes_id FROM podcasts WHERE title='Brown Suga Diaries'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "E10",
+      "family": "entity_matching",
+      "db_id": "shipping",
+      "source_question_ids": [
+        5578,
+        5580
+      ],
+      "witness_sql": "SELECT s.ship_id,d.first_name,d.last_name,c.cust_name FROM shipment s JOIN driver d ON d.driver_id=s.driver_id JOIN customer c ON c.cust_id=s.cust_id",
+      "focus": "人名对应 driver 名字段，企业名对应 customer 名字段；不能把名字直接与外键相比。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List IDs of shipments driven by Sue Newell.",
+          "sql": "SELECT s.ship_id FROM shipment s JOIN driver d ON d.driver_id=s.driver_id WHERE d.first_name='Sue' AND d.last_name='Newell'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [
+              [
+                1,
+                "eq",
+                "Sue"
+              ],
+              [
+                2,
+                "eq",
+                "Newell"
+              ]
+            ],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "List IDs of shipments ordered by S K L Enterprises Inc.",
+          "sql": "SELECT s.ship_id FROM shipment s JOIN customer c ON c.cust_id=s.cust_id WHERE c.cust_name='S K L Enterprises Inc'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [
+              [
+                3,
+                "eq",
+                "S K L Enterprises Inc"
+              ]
+            ],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A01",
+      "family": "aggregation_level",
+      "db_id": "human_resources",
+      "source_question_ids": [
+        8936,
+        8940
+      ],
+      "witness_sql": "SELECT locationID FROM employee WHERE locationID IS NOT NULL",
+      "focus": "先按办公地点统计员工，再区分输出地点 ID 与统计合格地点数量。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "Which office location IDs have more than two employees? Return one location ID per row.",
+          "sql": "SELECT locationID FROM employee WHERE locationID IS NOT NULL GROUP BY locationID HAVING COUNT(*)>2",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 2,
+            "mode": "keys"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many office locations have more than two employees? Return one count.",
+          "sql": "SELECT COUNT(*) FROM (SELECT locationID FROM employee WHERE locationID IS NOT NULL GROUP BY locationID HAVING COUNT(*)>2) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 2,
+            "mode": "count_groups"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A02",
+      "family": "aggregation_level",
+      "db_id": "university",
+      "source_question_ids": [
+        7991
+      ],
+      "witness_sql": "SELECT ranking_system_id FROM ranking_criteria WHERE ranking_system_id IS NOT NULL",
+      "focus": "合格排名系统的数量与这些系统所属标准总数，是不同聚合层级。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "How many ranking systems have more than three criteria? Return one count.",
+          "sql": "SELECT COUNT(*) FROM (SELECT ranking_system_id FROM ranking_criteria WHERE ranking_system_id IS NOT NULL GROUP BY ranking_system_id HAVING COUNT(*)>3) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 3,
+            "mode": "count_groups"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many criteria in total belong to ranking systems that each have more than three criteria? Return one count.",
+          "sql": "SELECT COUNT(*) FROM ranking_criteria WHERE ranking_system_id IN (SELECT ranking_system_id FROM ranking_criteria WHERE ranking_system_id IS NOT NULL GROUP BY ranking_system_id HAVING COUNT(*)>3)",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 3,
+            "mode": "sum_sizes"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A03",
+      "family": "aggregation_level",
+      "db_id": "sales",
+      "source_question_ids": [
+        5363,
+        5364
+      ],
+      "witness_sql": "SELECT CustomerID,Quantity FROM Sales WHERE SalesID BETWEEN 1 AND 100",
+      "focus": "在同一销售范围内区分单笔数量阈值与按客户累计数量阈值；明确比较单位。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "Within SalesID 1 through 100 inclusive, how many sale records have a quantity greater than 20?",
+          "sql": "SELECT COUNT(*) FROM Sales WHERE SalesID BETWEEN 1 AND 100 AND Quantity>20",
+          "reference": {
+            "kind": "count",
+            "filter": [
+              [
+                1,
+                "gt",
+                20
+              ]
+            ]
+          }
+        },
+        {
+          "variant": "b",
+          "question": "Within SalesID 1 through 100 inclusive, how many customers have a total purchased quantity greater than 20 across their sales?",
+          "sql": "SELECT COUNT(*) FROM (SELECT CustomerID FROM Sales WHERE SalesID BETWEEN 1 AND 100 GROUP BY CustomerID HAVING SUM(Quantity)>20) q",
+          "reference": {
+            "kind": "group_sums_count",
+            "key": 0,
+            "value": 1,
+            "threshold": 20
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A04",
+      "family": "aggregation_level",
+      "db_id": "music_platform_2",
+      "source_question_ids": [
+        7918,
+        7922
+      ],
+      "witness_sql": "SELECT c.podcast_id FROM categories c JOIN podcasts p ON p.podcast_id=c.podcast_id WHERE p.title LIKE '%Life%'",
+      "focus": "每个播客的类别数达到四类，先筛播客，再选择列举或计数，不统计类别总行数。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "Among podcasts whose title contains Life (case-insensitive), list internal IDs of those assigned to at least four categories, once per podcast.",
+          "sql": "SELECT c.podcast_id FROM categories c JOIN podcasts p ON p.podcast_id=c.podcast_id WHERE p.title LIKE '%Life%' GROUP BY c.podcast_id HAVING COUNT(*)>=4",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 3,
+            "mode": "keys"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "Among podcasts whose title contains Life (case-insensitive), how many are assigned to at least four categories? Return one count.",
+          "sql": "SELECT COUNT(*) FROM (SELECT c.podcast_id FROM categories c JOIN podcasts p ON p.podcast_id=c.podcast_id WHERE p.title LIKE '%Life%' GROUP BY c.podcast_id HAVING COUNT(*)>=4) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 3,
+            "mode": "count_groups"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A05",
+      "family": "aggregation_level",
+      "db_id": "books",
+      "source_question_ids": [
+        5915,
+        5916
+      ],
+      "witness_sql": "SELECT publisher_id FROM book WHERE publisher_id IS NOT NULL",
+      "focus": "书的数量按出版社 ID 分组；合格出版社数量必须在分组筛选之后计算。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List publisher IDs that have more than ten books in the database, once per publisher.",
+          "sql": "SELECT publisher_id FROM book WHERE publisher_id IS NOT NULL GROUP BY publisher_id HAVING COUNT(*)>10",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 10,
+            "mode": "keys"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many publishers have more than ten books in the database?",
+          "sql": "SELECT COUNT(*) FROM (SELECT publisher_id FROM book WHERE publisher_id IS NOT NULL GROUP BY publisher_id HAVING COUNT(*)>10) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 10,
+            "mode": "count_groups"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A06",
+      "family": "aggregation_level",
+      "db_id": "world",
+      "source_question_ids": [
+        7824
+      ],
+      "witness_sql": "SELECT CountryCode FROM City",
+      "focus": "满足城市数阈值的国家数与这些国家内记录的城市总数不同，不与国家代码本身比较。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "How many countries have more than ten cities recorded in City? Return one count.",
+          "sql": "SELECT COUNT(*) FROM (SELECT CountryCode FROM City GROUP BY CountryCode HAVING COUNT(*)>10) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 10,
+            "mode": "count_groups"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many recorded cities in total are in countries that each have more than ten recorded cities?",
+          "sql": "SELECT COUNT(*) FROM City WHERE CountryCode IN (SELECT CountryCode FROM City GROUP BY CountryCode HAVING COUNT(*)>10)",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 10,
+            "mode": "sum_sizes"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A07",
+      "family": "aggregation_level",
+      "db_id": "shipping",
+      "source_question_ids": [
+        5580
+      ],
+      "witness_sql": "SELECT driver_id FROM shipment WHERE driver_id IS NOT NULL",
+      "focus": "从单个司机运单记录聚合到司机，再统计合格司机，不把司机 ID 与阈值比较。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List IDs of drivers who have handled more than two shipments, once per driver.",
+          "sql": "SELECT driver_id FROM shipment WHERE driver_id IS NOT NULL GROUP BY driver_id HAVING COUNT(*)>2",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 2,
+            "mode": "keys"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many drivers have handled more than two shipments?",
+          "sql": "SELECT COUNT(*) FROM (SELECT driver_id FROM shipment WHERE driver_id IS NOT NULL GROUP BY driver_id HAVING COUNT(*)>2) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 2,
+            "mode": "count_groups"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A08",
+      "family": "aggregation_level",
+      "db_id": "car_retails",
+      "source_question_ids": [
+        1544
+      ],
+      "witness_sql": "SELECT country FROM customers",
+      "focus": "同一客户表按国家分组后区分列出国家和统计国家，不能直接 COUNT 所有客户。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List countries with more than five customers in the database, once per country.",
+          "sql": "SELECT country FROM customers GROUP BY country HAVING COUNT(*)>5",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 5,
+            "mode": "keys"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many countries have more than five customers in the database?",
+          "sql": "SELECT COUNT(*) FROM (SELECT country FROM customers GROUP BY country HAVING COUNT(*)>5) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 5,
+            "mode": "count_groups"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A09",
+      "family": "aggregation_level",
+      "db_id": "airline",
+      "source_question_ids": [
+        5824
+      ],
+      "witness_sql": "SELECT ORIGIN FROM Airlines WHERE FL_DATE='2018/8/1' AND DEP_DELAY>0",
+      "focus": "先限定日期与起飞延误，再按出发机场聚合；不把目的地作为分组键。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "Use FL_DATE='2018/8/1'. A departure delay means DEP_DELAY>0.",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "List departure airport codes with more than five departure-delayed flight records on August 1, 2018, once per airport.",
+          "sql": "SELECT ORIGIN FROM Airlines WHERE FL_DATE='2018/8/1' AND DEP_DELAY>0 GROUP BY ORIGIN HAVING COUNT(*)>5",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 5,
+            "mode": "keys"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "How many departure airports had more than five departure-delayed flight records on August 1, 2018?",
+          "sql": "SELECT COUNT(*) FROM (SELECT ORIGIN FROM Airlines WHERE FL_DATE='2018/8/1' AND DEP_DELAY>0 GROUP BY ORIGIN HAVING COUNT(*)>5) q",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 5,
+            "mode": "count_groups"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "A10",
+      "family": "aggregation_level",
+      "db_id": "books",
+      "source_question_ids": [
+        5916,
+        5942
+      ],
+      "witness_sql": "SELECT publisher_id,num_pages FROM book WHERE publisher_id IS NOT NULL AND num_pages IS NOT NULL",
+      "focus": "区分出版社均值的等权平均与全部书籍的平均；二者权重不同，排除缺失页数与缺失出版社。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For books with a known publisher ID and page count, calculate the mean page count per publisher first, then return the unweighted mean of those publisher means.",
+          "sql": "SELECT AVG(mean_pages) FROM (SELECT AVG(num_pages) AS mean_pages FROM book WHERE publisher_id IS NOT NULL AND num_pages IS NOT NULL GROUP BY publisher_id) q",
+          "reference": {
+            "kind": "mean",
+            "key": 0,
+            "value": 1,
+            "mode": "group_means"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For books with a known publisher ID and page count, return the mean page count over all individual books, giving each book equal weight.",
+          "sql": "SELECT AVG(num_pages) FROM book WHERE publisher_id IS NOT NULL AND num_pages IS NOT NULL",
+          "reference": {
+            "kind": "mean",
+            "key": 0,
+            "value": 1,
+            "mode": "rows"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O01",
+      "family": "output_contract",
+      "db_id": "human_resources",
+      "source_question_ids": [
+        8932
+      ],
+      "witness_sql": "SELECT firstname,lastname FROM employee WHERE performance='Good'",
+      "focus": "同一批员工保持行数，只改变姓名是两列还是单列，不增加中间名、去重或其他筛选。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For employees with Good performance, return first name and last name in two separate columns, one row per employee.",
+          "sql": "SELECT firstname,lastname FROM employee WHERE performance='Good'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For employees with Good performance, return one full-name column formed as first name, one space, then last name; keep one row per employee.",
+          "sql": "SELECT firstname||' '||lastname FROM employee WHERE performance='Good'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              {
+                "concat": [
+                  0,
+                  1
+                ],
+                "separator": " "
+              }
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O02",
+      "family": "output_contract",
+      "db_id": "sales",
+      "source_question_ids": [
+        5363
+      ],
+      "witness_sql": "SELECT CustomerID FROM Sales WHERE SalesID BETWEEN 1 AND 100",
+      "focus": "同一销售范围返回客户 ID，逐销售保留重复或每客户去重，不能默认 official 集合语义。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For SalesID 1 through 100 inclusive, return one customer ID per sale record. Preserve repeated customer IDs.",
+          "sql": "SELECT CustomerID FROM Sales WHERE SalesID BETWEEN 1 AND 100",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For SalesID 1 through 100 inclusive, list the customer IDs once each, removing duplicates.",
+          "sql": "SELECT DISTINCT CustomerID FROM Sales WHERE SalesID BETWEEN 1 AND 100",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O03",
+      "family": "output_contract",
+      "db_id": "world",
+      "source_question_ids": [
+        7822
+      ],
+      "witness_sql": "SELECT IsOfficial FROM CountryLanguage WHERE CountryCode='USA'",
+      "focus": "同一批语言计数，分别返回官方/非官方两列，或返回前者减后者的一列；编码 T/F 明确。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "USA is CountryCode='USA'; IsOfficial='T' means official and 'F' means non-official.",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For USA, return two counts in one row: recorded official languages first and recorded non-official languages second.",
+          "sql": "SELECT SUM(CASE WHEN IsOfficial='T' THEN 1 ELSE 0 END),SUM(CASE WHEN IsOfficial='F' THEN 1 ELSE 0 END) FROM CountryLanguage WHERE CountryCode='USA'",
+          "reference": {
+            "kind": "two_counts",
+            "column": 0,
+            "values": [
+              "T",
+              "F"
+            ],
+            "mode": "separate"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For USA, return one value: the count of recorded official languages minus the count of recorded non-official languages.",
+          "sql": "SELECT SUM(CASE WHEN IsOfficial='T' THEN 1 ELSE 0 END)-SUM(CASE WHEN IsOfficial='F' THEN 1 ELSE 0 END) FROM CountryLanguage WHERE CountryCode='USA'",
+          "reference": {
+            "kind": "two_counts",
+            "column": 0,
+            "values": [
+              "T",
+              "F"
+            ],
+            "mode": "difference"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O04",
+      "family": "output_contract",
+      "db_id": "shipping",
+      "source_question_ids": [
+        5580
+      ],
+      "witness_sql": "SELECT c.cust_name FROM shipment s JOIN customer c ON c.cust_id=s.cust_id JOIN driver d ON d.driver_id=s.driver_id WHERE d.first_name='Sue' AND d.last_name='Newell'",
+      "focus": "同一个司机的客户名，保留每运单一行与去重客户名称，明确名称去重不是实体 ID 去重。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For shipments driven by Sue Newell, return the customer's name once per shipment, preserving repeated names.",
+          "sql": "SELECT c.cust_name FROM shipment s JOIN customer c ON c.cust_id=s.cust_id JOIN driver d ON d.driver_id=s.driver_id WHERE d.first_name='Sue' AND d.last_name='Newell'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For shipments driven by Sue Newell, list the distinct customer names, each name only once.",
+          "sql": "SELECT DISTINCT c.cust_name FROM shipment s JOIN customer c ON c.cust_id=s.cust_id JOIN driver d ON d.driver_id=s.driver_id WHERE d.first_name='Sue' AND d.last_name='Newell'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O05",
+      "family": "output_contract",
+      "db_id": "car_retails",
+      "source_question_ids": [
+        1548
+      ],
+      "witness_sql": "SELECT e.firstName,e.lastName FROM employees e JOIN offices o ON o.officeCode=e.officeCode WHERE o.city='Sydney'",
+      "focus": "员工选择相同，要求单列完整姓名时用 SQLite 拼接而不是数值加法；另一题保留两列。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For employees whose office is in Sydney, return first and last names as two columns, one row per employee.",
+          "sql": "SELECT e.firstName,e.lastName FROM employees e JOIN offices o ON o.officeCode=e.officeCode WHERE o.city='Sydney'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For employees whose office is in Sydney, return one full-name column using first name, one space, then last name, one row per employee.",
+          "sql": "SELECT e.firstName||' '||e.lastName FROM employees e JOIN offices o ON o.officeCode=e.officeCode WHERE o.city='Sydney'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              {
+                "concat": [
+                  0,
+                  1
+                ],
+                "separator": " "
+              }
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O06",
+      "family": "output_contract",
+      "db_id": "books",
+      "source_question_ids": [
+        5915
+      ],
+      "witness_sql": "SELECT b.title,b.num_pages FROM book b JOIN publisher p ON p.publisher_id=b.publisher_id WHERE p.publisher_name='Thomas Nelson'",
+      "focus": "同一出版社的书，一题只要标题，另一题还要页数；保留一书一行，不按标题去重。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For each book published by Thomas Nelson, return its title only. Keep one row per book, even if titles repeat.",
+          "sql": "SELECT b.title FROM book b JOIN publisher p ON p.publisher_id=b.publisher_id WHERE p.publisher_name='Thomas Nelson'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For each book published by Thomas Nelson, return its title and page count as two columns. Keep one row per book.",
+          "sql": "SELECT b.title,b.num_pages FROM book b JOIN publisher p ON p.publisher_id=b.publisher_id WHERE p.publisher_name='Thomas Nelson'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O07",
+      "family": "output_contract",
+      "db_id": "music_platform_2",
+      "source_question_ids": [
+        7920
+      ],
+      "witness_sql": "SELECT itunes_id,itunes_url FROM podcasts WHERE title='Brown Suga Diaries'",
+      "focus": "同一播客，两列 ID/URL 与 URL 一列；不额外输出内部 ID 或标题。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For the podcast titled Brown Suga Diaries, return its iTunes ID followed by its iTunes URL as two columns.",
+          "sql": "SELECT itunes_id,itunes_url FROM podcasts WHERE title='Brown Suga Diaries'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0,
+              1
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For the podcast titled Brown Suga Diaries, return only its iTunes URL.",
+          "sql": "SELECT itunes_url FROM podcasts WHERE title='Brown Suga Diaries'",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              1
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O08",
+      "family": "output_contract",
+      "db_id": "university",
+      "source_question_ids": [
+        7991
+      ],
+      "witness_sql": "SELECT ranking_system_id FROM ranking_criteria WHERE ranking_system_id IS NOT NULL",
+      "focus": "同一系统分组的计数结果，是否输出分组键由题意决定；不因数量相同而合并系统。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For each ranking system with at least one criterion, return its system ID and number of criteria as two columns.",
+          "sql": "SELECT ranking_system_id,COUNT(*) FROM ranking_criteria WHERE ranking_system_id IS NOT NULL GROUP BY ranking_system_id",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 0,
+            "mode": "key_sizes"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For each ranking system with at least one criterion, return only its number of criteria, one row per system. Preserve equal counts from different systems.",
+          "sql": "SELECT COUNT(*) FROM ranking_criteria WHERE ranking_system_id IS NOT NULL GROUP BY ranking_system_id",
+          "reference": {
+            "kind": "group_counts",
+            "key": 0,
+            "threshold": 0,
+            "mode": "sizes"
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O09",
+      "family": "output_contract",
+      "db_id": "airline",
+      "source_question_ids": [
+        5822
+      ],
+      "witness_sql": "SELECT DEST FROM Airlines WHERE FL_DATE='2018/8/1' AND CANCELLED=1",
+      "focus": "取消航班的目的地代码，一航班一行与不同目的地一行，不能隐式去重。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "Use FL_DATE='2018/8/1'. CANCELLED=1 identifies cancelled flights.",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "For cancelled flights on August 1, 2018, return one destination airport code per flight record, keeping duplicates.",
+          "sql": "SELECT DEST FROM Airlines WHERE FL_DATE='2018/8/1' AND CANCELLED=1",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": false
+          }
+        },
+        {
+          "variant": "b",
+          "question": "For cancelled flights on August 1, 2018, list distinct destination airport codes, each only once.",
+          "sql": "SELECT DISTINCT DEST FROM Airlines WHERE FL_DATE='2018/8/1' AND CANCELLED=1",
+          "reference": {
+            "kind": "project",
+            "columns": [
+              0
+            ],
+            "filter": [],
+            "distinct": true
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "O10",
+      "family": "output_contract",
+      "db_id": "human_resources",
+      "source_question_ids": [
+        8932
+      ],
+      "witness_sql": "SELECT performance FROM employee",
+      "focus": "Good/Poor 人数分别输出或相减；其他评分及 NULL 不纳入任一人数。",
+      "reviewer": "codex",
+      "review_status": "codex_semantic_reviewed",
+      "evidence": "",
+      "variants": [
+        {
+          "variant": "a",
+          "question": "Return two employee counts in one row: employees rated Good first, then employees rated Poor.",
+          "sql": "SELECT SUM(CASE WHEN performance='Good' THEN 1 ELSE 0 END),SUM(CASE WHEN performance='Poor' THEN 1 ELSE 0 END) FROM employee",
+          "reference": {
+            "kind": "two_counts",
+            "column": 0,
+            "values": [
+              "Good",
+              "Poor"
+            ],
+            "mode": "separate"
+          }
+        },
+        {
+          "variant": "b",
+          "question": "Return one value: the number of employees rated Good minus the number rated Poor.",
+          "sql": "SELECT SUM(CASE WHEN performance='Good' THEN 1 ELSE 0 END)-SUM(CASE WHEN performance='Poor' THEN 1 ELSE 0 END) FROM employee",
+          "reference": {
+            "kind": "two_counts",
+            "column": 0,
+            "values": [
+              "Good",
+              "Poor"
+            ],
+            "mode": "difference"
+          }
+        }
+      ]
+    }
+  ]
+}

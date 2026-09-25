@@ -1,0 +1,20 @@
+{
+  "source_run_id": "f9dc29d50c69",
+  "questions": "data/processed/val.json",
+  "source_questions": "data/bird/train/train.json",
+  "train_questions": "data/processed/train_filtered.json",
+  "train_seed_per_family": 4,
+  "split_manifest": "configs/splits/train_val.json",
+  "outcomes": "results/outcomes/val_v1.jsonl",
+  "predictions": "results/preds/val_v1.jsonl",
+  "id_mode": "position",
+  "seed": 0,
+  "failure_review_size": 36,
+  "gap_review_size": 6,
+  "replay_extraction_changes": true,
+  "databases_dir": "data/bird/train/train_databases",
+  "replay_timeout_s": 10,
+  "replay_max_rows": 10000,
+  "annotations": "docs/analysis/base_val_v1_annotations.json",
+  "output_dir": "results/analysis/base_val_v1"
+}

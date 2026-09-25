@@ -88,7 +88,9 @@ def extract_sql(text: str) -> str:
 
     starts = list(_BARE_START_RE.finditer(body))
     if starts:
-        return _tidy(body[starts[-1].start() :])
+        # A later SELECT may be a nested query or the body of a CTE. Preserve
+        # the whole bare answer; validation must also see multiple statements.
+        return _tidy(body[starts[0].start() :])
 
     return ""
 

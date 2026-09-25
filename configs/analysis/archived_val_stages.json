@@ -1,0 +1,12 @@
+{
+  "questions": "data/processed/val.json",
+  "split_manifest": "configs/splits/train_val.json",
+  "output_dir": "results/analysis/archived_val_stages",
+  "seed": 0,
+  "annotations": "docs/analysis/archived_val_annotations.json",
+  "stages": {
+    "base": {"run_id": "f9dc29d50c69", "stem": "val_v1", "id_mode": "position"},
+    "early_sft": {"run_id": "6a3dcb447684", "stem": "val_sft", "id_mode": "position"},
+    "old_grpo": {"run_id": "a8f7fa3bdecc", "stem": "val_grpo", "id_mode": "original"}
+  }
+}
