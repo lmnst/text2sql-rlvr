@@ -657,22 +657,40 @@ def expand_selection(
     evidence: str = "",
     fk_hops: int = 1,
     lex_top_k: int = 0,
+    cap: int | None = None,
 ) -> tuple[str, ...]:
-    """Recall-oriented expansion of a predicted table set.
+    """Recall-oriented expansion of a predicted table set, with a size cap.
 
     A missed gold table kills the question while an extra table costs little,
-    and on the first selector most misses were bridge tables one foreign-key
-    hop from a table the model did pick. So: add every table within
-    ``fk_hops`` foreign-key hops of the prediction, then the ``lex_top_k``
-    best lexical matches. Returned in schema order.
+    but only up to a point: on val 788 the base generator matched the oracle
+    when handed at most 4 tables and fell below the lexical linker beyond 8.
+    So: start from the prediction, add the ``lex_top_k`` best lexical
+    matches, then walk ``fk_hops`` foreign-key hops adding neighbours in
+    lexical-score order, stopping once ``cap`` tables are reached (``None``
+    keeps every neighbour). Returned in schema order.
     """
     graph = foreign_key_graph(schema)
     canonical = {name.casefold(): name for name in graph}
-    chosen = {canonical[p.casefold()] for p in predicted if p.casefold() in canonical}
-    frontier = set(chosen)
+    ranking = lexical_table_ranking(schema, question, evidence)
+    position = {name: index for index, name in enumerate(ranking)}
+    chosen: list[str] = []
+    for name in list(predicted) + list(ranking[:lex_top_k]):
+        table = canonical.get(name.casefold())
+        if table is not None and table not in chosen:
+            chosen.append(table)
+    frontier = list(chosen)
     for _ in range(max(fk_hops, 0)):
-        frontier = {nb for table in frontier for nb in graph[table]} - chosen
-        chosen |= frontier
-    if lex_top_k > 0:
-        chosen |= set(lexical_table_ranking(schema, question, evidence)[:lex_top_k])
+        neighbours = sorted(
+            {nb for table in frontier for nb in graph[table] if nb not in chosen},
+            key=lambda name: position[name],
+        )
+        added = []
+        for name in neighbours:
+            if cap is not None and len(chosen) >= cap:
+                break
+            chosen.append(name)
+            added.append(name)
+        frontier = added
+        if not frontier:
+            break
     return tuple(table.name for table in schema.tables if table.name in chosen)

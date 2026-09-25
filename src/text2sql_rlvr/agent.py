@@ -39,13 +39,20 @@ AGENT_SYSTEM_PROMPT = (
     "before committing to an answer."
 )
 
+#: The instruction deliberately spells out the fence in words rather than
+#: showing one. An earlier version wrote the literal opener followed by prose;
+#: 34 of 788 replies copied that whole phrase as their opening fence, so the
+#: extracted "statement" began with the word "code" and the validator rejected
+#: it. Never put a fence opener next to text the model could read as a template.
 AGENT_INSTRUCTION = (
-    "Answer the question with one SQLite SELECT query. Take exactly one action per reply:\n"
-    "- DESCRIBE <table>: show that table's full definition and a few example rows.\n"
-    "- A ```sql code block: run the query and see its result or its error.\n"
-    "- FINAL followed by a ```sql code block: commit to that query as the answer.\n"
-    "Run a query and check its result before FINAL unless you are certain. "
-    "Reply with the action only, no explanation."
+    "Answer the question with one SQLite SELECT query. Take exactly one action per "
+    "reply, and reply with the action only, no explanation:\n"
+    "- DESCRIBE <table> shows that table's full definition and a few example rows.\n"
+    "- A SQL query on its own, inside a markdown sql code block, is executed: you see "
+    "its result or its error.\n"
+    "- The word FINAL on its own line, followed by a SQL code block, commits that "
+    "query as your answer.\n"
+    "Run a query and check its result before FINAL unless you are certain."
 )
 
 FINAL, EXECUTE, DESCRIBE, NONE = "final", "execute", "describe", "none"
@@ -60,6 +67,24 @@ _DESCRIBE_RE = re.compile(
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 ChatFn = Callable[[list[dict[str, str]]], str]
+
+#: Loop-level guardrails. They do not make an untrained model smarter, but
+#: they stop it from spending its whole budget re-reading a table it was
+#: already shown or re-running a query whose result it already has, which is
+#: exactly what an untrained 1.7B did on the first smoke test (69 of 70
+#: DESCRIBEs targeted a table already in the prompt; no episode used FINAL).
+NUDGE_ALREADY_SHOWN = (
+    "Table {table} is already shown in full above. Do not describe it again: run a "
+    "query with a ```sql block, or answer with FINAL and a ```sql block."
+)
+NUDGE_REPEATED_QUERY = (
+    "You already ran exactly this query and saw its result above. If it answers the "
+    "question, reply FINAL followed by the same ```sql block; otherwise change the query."
+)
+HINT_RESULT_OK = (
+    "If this result answers the question, reply FINAL followed by the same ```sql block."
+)
+HINT_LAST_TURN = "This is your last reply: answer with FINAL and a ```sql block."
 
 
 @dataclass(frozen=True)
@@ -190,6 +215,22 @@ class Episode:
         return sum(1 for s in self.steps if s.action == kind)
 
     @property
+    def final_verified(self) -> bool:
+        """Whether the committed query is one this episode ran successfully.
+
+        A model can watch a query succeed and then commit a different one. That
+        answer carries no execution evidence, so trajectory filtering and error
+        analysis both need to tell the two cases apart.
+        """
+        if not self.final_sql:
+            return False
+        target = " ".join(self.final_sql.split()).casefold()
+        return any(
+            step.exec_status == OK and " ".join(step.sql.split()).casefold() == target
+            for step in self.steps
+        )
+
+    @property
     def first_exec_status(self) -> str | None:
         for step in self.steps:
             if step.exec_status is not None:
@@ -210,6 +251,7 @@ class Episode:
             ),
             "first_exec_status": self.first_exec_status,
             "final_exec_status": self.final_exec_status,
+            "final_verified": self.final_verified,
             "error": self.error,
             "steps": [vars(s) for s in self.steps],
             "messages": self.messages,
@@ -225,13 +267,20 @@ def run_episode(
     chat: ChatFn,
     *,
     other_tables: Sequence[str] = (),
+    shown_tables: Sequence[str] = (),
     config: AgentConfig | None = None,
 ) -> Episode:
-    """Drive one question to a final SQL. ``chat`` maps messages to a reply."""
+    """Drive one question to a final SQL. ``chat`` maps messages to a reply.
+
+    ``shown_tables`` are the tables whose full definition is already in
+    ``schema_text``; describing one of them again is answered with a nudge
+    instead of the definition.
+    """
     config = config or AgentConfig()
     episode = Episode(question_id=example.question_id, db_id=example.db_id)
     messages = build_agent_messages(example, schema_text, other_tables)
     executed: list[tuple[str, str]] = []  # (sql, status) in order
+    seen_tables = {name.casefold() for name in shown_tables}
 
     for turn in range(1, config.max_turns + 1):
         started = time.monotonic()
@@ -254,17 +303,30 @@ def run_episode(
             break
 
         if action.kind == EXECUTE:
+            repeated = any(sql == action.sql for sql, _ in executed)
             result = executor.execute(db_path, action.sql)
             step.exec_status = result.status
             step.n_rows = len(result.rows) if result.status == OK else None
             executed.append((action.sql, result.status))
-            step.observation = format_result(
-                result, max_rows=config.max_rows_shown, max_cell_chars=config.max_cell_chars
-            )
+            if repeated:
+                step.observation = NUDGE_REPEATED_QUERY
+            else:
+                step.observation = format_result(
+                    result, max_rows=config.max_rows_shown,
+                    max_cell_chars=config.max_cell_chars,
+                )
+                if result.status == OK:
+                    step.observation += "\n" + HINT_RESULT_OK
         elif action.kind == DESCRIBE:
-            step.observation = describe_table(
-                schema, action.table, db_path, sample_rows=config.sample_rows
-            )
+            table = schema.table(action.table)
+            if table is not None and table.name.casefold() in seen_tables:
+                step.observation = NUDGE_ALREADY_SHOWN.format(table=table.name)
+            else:
+                step.observation = describe_table(
+                    schema, action.table, db_path, sample_rows=config.sample_rows
+                )
+                if table is not None:
+                    seen_tables.add(table.name.casefold())
         else:
             step.observation = (
                 "Your reply contained no action. Send DESCRIBE <table>, a ```sql block "
@@ -272,7 +334,10 @@ def run_episode(
             )
         episode.steps.append(step)
         if turn < config.max_turns:
-            messages.append({"role": "user", "content": step.observation})
+            observation = step.observation
+            if turn == config.max_turns - 1:
+                observation += "\n" + HINT_LAST_TURN
+            messages.append({"role": "user", "content": observation})
 
     if episode.stop_reason != STOP_FINAL and not episode.final_sql:
         ok = [sql for sql, status in executed if status == OK]

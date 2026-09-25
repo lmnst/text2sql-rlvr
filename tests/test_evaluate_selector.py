@@ -191,7 +191,7 @@ def test_fk_expansion_recovers_bridge_table_and_is_written_for_generate(
     assert summary["metrics"]["all_gold_retained_rate"] == 0.5
     assert summary["metrics"]["expanded_all_gold_retained_rate"] == 1.0
     assert summary["metrics"]["expanded_mean_selected_tables"] == 2.0
-    assert summary["expansion"] == {"mode": "fk", "fk_hops": 1, "lex_top_k": 0}
+    assert summary["expansion"] == {"mode": "fk", "fk_hops": 1, "lex_top_k": 0, "cap": None}
 
     # Rescoring a finished file sends no request and can change the expansion.
     n_before = len(server.requests)

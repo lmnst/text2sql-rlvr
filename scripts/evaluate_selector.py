@@ -64,6 +64,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "neighbours, or neighbours plus the best lexical matches")
     parser.add_argument("--fk-hops", type=int, default=1)
     parser.add_argument("--lex-top-k", type=int, default=2)
+    parser.add_argument("--expand-cap", type=int, default=0,
+                        help="stop adding foreign-key neighbours once this many tables are "
+                             "kept; 0 keeps every neighbour")
 
     parser.add_argument("--base-url", default="http://localhost:8000/v1")
     parser.add_argument("--model", required=True)
@@ -259,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
             "mode": args.expand,
             "fk_hops": args.fk_hops,
             "lex_top_k": args.lex_top_k if args.expand == "fk+lex" else 0,
+            "cap": args.expand_cap or None,
         }
     for qid, record in records.items():
         row = by_id[qid]
@@ -274,6 +278,7 @@ def main(argv: list[str] | None = None) -> int:
                 evidence=row.get("evidence", ""),
                 fk_hops=expansion["fk_hops"],
                 lex_top_k=expansion["lex_top_k"],
+                cap=expansion["cap"],
             )
         kept = {name.casefold() for name in predicted}
         kept_expanded = {name.casefold() for name in expanded}

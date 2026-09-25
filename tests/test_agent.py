@@ -15,7 +15,11 @@ from text2sql_rlvr.agent import (
     DESCRIBE,
     EXECUTE,
     FINAL,
+    HINT_LAST_TURN,
+    HINT_RESULT_OK,
     NONE,
+    NUDGE_ALREADY_SHOWN,
+    NUDGE_REPEATED_QUERY,
     STOP_BUDGET,
     STOP_FINAL,
     STOP_NO_SQL,
@@ -90,6 +94,7 @@ def test_episode_describes_recovers_from_an_error_and_commits(company):
     assert episode.steps[2].exec_status == OK and episode.steps[2].n_rows == 3
     assert episode.steps[2].observation.startswith("Query result: 3 row(s)")
     assert "Ada" in episode.steps[2].observation
+    assert episode.steps[2].observation.endswith(HINT_RESULT_OK)
     assert episode.first_exec_status == ERROR and episode.final_exec_status == OK
 
     # Observations were fed back as user turns, in order, and the record scores.
@@ -163,8 +168,64 @@ def test_prompt_lists_hidden_tables_for_describe(company):
     user = messages[1]["content"]
     assert "not shown above" in user and "dept" in user
     assert example.evidence in user and example.question in user
-    assert user.rstrip().endswith("no explanation.")
+    assert user.rstrip().endswith("unless you are certain.")
+    # the instruction must not hand the model a fence opener it can copy as a template
+    assert "```" not in user.split("Take exactly one action")[1]
     assert "not shown above" not in build_agent_messages(example, "x")[1]["content"]
+
+
+def test_guardrails_nudge_redundant_describes_and_repeated_queries(company):
+    split, schema = company
+    example = split.load()[0]
+    chat = scripted([
+        "DESCRIBE staff",                              # already shown in the prompt
+        "DESCRIBE dept",                               # not shown: real description
+        "DESCRIBE dept",                               # seen once already
+        "```sql\nSELECT count(*) FROM staff\n```",
+        "```sql\nSELECT count(*) FROM staff\n```",   # same query again
+        "FINAL\n```sql\nSELECT count(*) FROM staff\n```",
+    ])
+    with SqlExecutor() as executor:
+        episode = run_episode(
+            example, schema, format_schema(schema), split.db_path("company"), executor, chat,
+            shown_tables=("staff",), config=AgentConfig(max_turns=6),
+        )
+    obs = [s.observation for s in episode.steps]
+    assert obs[0] == NUDGE_ALREADY_SHOWN.format(table="staff")
+    assert obs[1].startswith("CREATE TABLE dept")
+    assert obs[2] == NUDGE_ALREADY_SHOWN.format(table="dept")
+    assert obs[3].startswith("Query result: 1 row(s)") and obs[3].endswith(HINT_RESULT_OK)
+    assert obs[4] == NUDGE_REPEATED_QUERY
+    assert episode.stop_reason == STOP_FINAL
+    # the message before the last allowed reply carries the last-turn hint
+    assert episode.messages[-2]["content"].endswith(HINT_LAST_TURN)
+    assert not episode.messages[-4]["content"].endswith(HINT_LAST_TURN)
+
+
+def test_final_verified_separates_committed_from_actually_run(company):
+    split, schema = company
+    example = split.load()[0]
+
+    checked = scripted([
+        "```sql\nSELECT count(*) FROM staff\n```",
+        "FINAL\n```sql\nSELECT   count(*)   FROM staff\n```",   # same query, different spacing
+    ])
+    switched = scripted([
+        "```sql\nSELECT count(*) FROM staff\n```",
+        "FINAL\n```sql\nSELECT count(*) FROM dept\n```",        # committed something else
+    ])
+    with SqlExecutor() as executor:
+        def run(chat):
+            return run_episode(
+                example, schema, format_schema(schema), split.db_path("company"),
+                executor, chat, config=AgentConfig(max_turns=2),
+            )
+
+        assert run(checked).final_verified
+        committed_blind = run(switched)
+        assert not committed_blind.final_verified
+        assert committed_blind.final_exec_status == OK   # it runs, it just was never checked
+        assert committed_blind.as_dict()["final_verified"] is False
 
 
 # ------------------------------------------------------------------ driver

@@ -181,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         other = [t.name for t in schema.tables if t.name.casefold() not in shown]
         episode = run_episode(
             example, schema, schema_text, split.db_path(example.db_id), executor, chat,
-            other_tables=other, config=config,
+            other_tables=other, shown_tables=selection.selected_tables, config=config,
         )
         record = episode.as_dict()
         record["schema_mode"] = selection.mode
@@ -224,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         "first_exec_status": dict(first),
         "final_exec_status": dict(final),
         "n_recovered_from_first_error": recovered,
+        "n_final_verified": sum(1 for r in records if r["final_verified"]),
         "request_errors": sum(1 for r in records if r["error"]),
     }
     print("\nagent summary")

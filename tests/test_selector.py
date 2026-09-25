@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from text2sql_rlvr.data import BirdExample, discover_split, format_schema, load_schema
-from text2sql_rlvr.data.schema import Column, DatabaseSchema, Table
+from text2sql_rlvr.data.schema import Column, DatabaseSchema, ForeignKey, Table
 from text2sql_rlvr.data.selector import (
     SelectorCase,
     annotate_case,
@@ -308,3 +308,24 @@ def test_trim_descriptions_cuts_text_and_drops_value_notes():
     assert trimmed.tables[0].columns[0].value_description is None
     assert trimmed.tables[0].columns[1].description is None
     assert trim_descriptions(schema, 0).tables[0].columns[0].description is None
+
+
+def test_expand_selection_cap_adds_neighbours_by_lexical_rank():
+    from text2sql_rlvr.data.selector import expand_selection
+
+    # hub -> a, b, c via foreign keys; the question mentions c, so c ranks first
+    schema = DatabaseSchema("d", (
+        Table("hub", (Column("id", "INTEGER"),), (
+            ForeignKey("a_id", "a", "id"), ForeignKey("b_id", "b", "id"),
+            ForeignKey("c_id", "c", "id"),
+        )),
+        Table("a", (Column("id", "INTEGER"),)),
+        Table("b", (Column("id", "INTEGER"),)),
+        Table("c", (Column("id", "INTEGER"), Column("colour", "TEXT"))),
+    ))
+    question = "What colour is c?"
+    assert expand_selection(schema, ("hub",), question=question) == ("hub", "a", "b", "c")
+    assert expand_selection(schema, ("hub",), question=question, cap=2) == ("hub", "c")
+    assert expand_selection(schema, ("hub",), question=question, cap=1) == ("hub",)
+    # lexical tables are added before the cap is applied to neighbours
+    assert expand_selection(schema, ("a",), question=question, lex_top_k=1, cap=2) == ("a", "c")
