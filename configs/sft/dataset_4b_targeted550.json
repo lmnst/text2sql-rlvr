@@ -1,0 +1,42 @@
+{
+ "source_questions": "data\\processed\\targeted550.json",
+ "source_questions_sha256": "f10fb7f023a8f1150a43f4f3aa98dcf7c7dd26eaa4358101a4c2ee1e451bb0d0",
+ "output": "data\\processed\\sft_4b_targeted550.jsonl",
+ "n_examples": 550,
+ "n_databases": 16,
+ "prompt_config": {
+  "schema_style": "ddl",
+  "include_descriptions": false,
+  "include_evidence": true,
+  "sample_rows": 0,
+  "instruction_version": "v1"
+ },
+ "schema_mode": "linked",
+ "selection": {
+  "outcomes": null,
+  "outcomes_sha256": "",
+  "policy": "all",
+  "size": 0,
+  "replay_fraction": 0.0,
+  "cap_per_db": 0,
+  "drop_gold_empty": false,
+  "seed": 0,
+  "report": null
+ },
+ "length_stats": {
+  "n": 550,
+  "chars_p50": 1649,
+  "chars_p95": 2583,
+  "chars_p99": 3566,
+  "chars_max": 3857,
+  "longest_db_id": "book_publishing_company",
+  "est_tokens_p99": 990,
+  "est_tokens_max": 1071,
+  "chars_per_token_assumed": 3.6
+ },
+ "cutoff_tokens_checked": 4096,
+ "n_over_budget": 0,
+ "git_sha": "1bf52d8c0f0a9e06a0d3066339f5fe3a9ebff379",
+ "git_dirty": true,
+ "command": "scripts/build_sft_data.py --questions data/processed/targeted550.json --schema-mode linked --out data/processed/sft_4b_targeted550.jsonl --manifest configs/sft/dataset_4b_targeted550.json"
+}

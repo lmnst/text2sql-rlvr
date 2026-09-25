@@ -95,3 +95,132 @@ class TestLengthReport:
         records = [build_sft_record(e, "S" * 5000) for e in split.load()]
         assert len(count_over_budget(records, 1000)) == 5
         assert count_over_budget(records, 10**9) == []
+
+
+def _outcomes(spec: dict[str, tuple[int, int]]) -> list[dict]:
+    """``{db: (n_failed, n_solved)}`` -> outcome records with unique ids."""
+    records = []
+    qid = 0
+    for db, (failed, solved) in spec.items():
+        for _ in range(failed):
+            records.append({"question_id": qid, "db_id": db, "official": False})
+            qid += 1
+        for _ in range(solved):
+            records.append({"question_id": qid, "db_id": db, "official": True})
+            qid += 1
+    return records
+
+
+def test_failure_policy_takes_wrong_answers_plus_a_replay_share():
+    from text2sql_rlvr.data.sft import select_sft_examples, selection_report
+
+    outcomes = _outcomes({"big": (200, 200), "small": (20, 20), "tiny": (4, 4)})
+    ids = select_sft_examples(
+        outcomes, policy="failure", size=60, replay_fraction=0.25, seed=0
+    )
+    report = selection_report(ids, outcomes)
+
+    assert report["n"] == 60
+    assert report["n_from_failures"] == 45 and report["n_from_solved"] == 15
+    # round-robin over databases: the 400-question database does not swamp the rest
+    assert report["n_databases"] == 3
+    # proportional sampling would give the 400-question database ~52 of the 60;
+    # round-robin gives it far fewer and drains the 8-question one entirely
+    assert report["questions_per_db"]["tiny"] == 8
+    assert report["questions_per_db"]["big"] < 30
+    assert ids == select_sft_examples(
+        outcomes, policy="failure", size=60, replay_fraction=0.25, seed=0
+    )
+
+
+def test_random_policy_is_the_control_and_all_keeps_everything():
+    from text2sql_rlvr.data.sft import select_sft_examples, selection_report
+
+    outcomes = _outcomes({"a": (30, 30), "b": (30, 30)})
+    control = select_sft_examples(outcomes, policy="random", size=40, seed=1)
+    assert selection_report(control, outcomes)["n"] == 40
+    assert len(select_sft_examples(outcomes)) == 120
+    assert select_sft_examples(outcomes, policy="random", size=40, seed=1) == control
+    assert select_sft_examples(outcomes, policy="random", size=40, seed=2) != control
+
+
+def test_selection_caps_per_database_and_rejects_bad_arguments():
+    import pytest
+
+    from text2sql_rlvr.data.sft import select_sft_examples, selection_report
+
+    outcomes = _outcomes({"a": (50, 0), "b": (50, 0), "c": (2, 0)})
+    ids = select_sft_examples(outcomes, policy="failure", cap_per_db=10, seed=0)
+    report = selection_report(ids, outcomes)
+    assert report["n"] == 22 and report["per_db_max"] == 10
+
+    # asking for more than exists returns what exists rather than raising
+    assert len(select_sft_examples(outcomes, policy="failure", size=500)) == 102
+
+    with pytest.raises(ValueError):
+        select_sft_examples(outcomes, policy="nonsense")
+    with pytest.raises(ValueError):
+        select_sft_examples(outcomes, policy="failure", replay_fraction=1.5)
+    with pytest.raises(ValueError):
+        select_sft_examples(outcomes, policy="random", replay_fraction=0.2)
+
+
+def test_builder_renders_linked_schema_and_honours_the_policy(bird_root, tmp_path):
+    import importlib.util
+    import json
+    import sys
+    from pathlib import Path
+
+    scripts = Path(__file__).resolve().parents[1] / "scripts"
+    sys.path.insert(0, str(scripts))
+    spec = importlib.util.spec_from_file_location(
+        "build_sft_data_script", scripts / "build_sft_data.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    split = discover_split(bird_root, "mini_dev")
+    questions = tmp_path / "questions.json"
+    questions.write_text(split.questions_path.read_text(encoding="utf-8"), encoding="utf-8")
+    outcomes = tmp_path / "outcomes.jsonl"
+    outcomes.write_text(
+        "".join(
+            json.dumps({"question_id": e.question_id, "db_id": e.db_id,
+                        "official": e.question_id in (0, 1)}) + "\n"
+            for e in split.load()
+        ),
+        encoding="utf-8",
+    )
+    out, manifest = tmp_path / "train.jsonl", tmp_path / "manifest.json"
+
+    assert module.main([
+        "--root", str(bird_root), "--split", "mini_dev", "--questions", str(questions),
+        "--out", str(out), "--manifest", str(manifest),
+        "--schema-mode", "linked", "--outcomes", str(outcomes), "--policy", "failure",
+    ]) == 0
+
+    records = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line]
+    assert {r["question_id"] for r in records} == {2, 3, 4}  # the three it got wrong
+    meta = json.loads(manifest.read_text(encoding="utf-8"))
+    assert meta["schema_mode"] == "linked"
+    assert meta["selection"]["policy"] == "failure"
+    assert meta["selection"]["report"]["n_from_failures"] == 3
+    assert meta["selection"]["outcomes_sha256"]
+
+    # "Who works in the Research department?" links dept and staff, not the whole schema
+    linked = next(r for r in records if r["question_id"] == 2)
+    assert "CREATE TABLE staff" in linked["messages"][1]["content"]
+    assert linked["messages"][-1]["content"].startswith("```sql")
+
+
+def test_selection_can_drop_questions_whose_gold_returns_nothing():
+    from text2sql_rlvr.data.sft import select_sft_examples
+
+    outcomes = [
+        {"question_id": 0, "db_id": "a", "official": False, "gold_empty": False},
+        {"question_id": 1, "db_id": "a", "official": False, "gold_empty": True},
+        {"question_id": 2, "db_id": "a", "official": True, "gold_empty": True},
+    ]
+    assert select_sft_examples(outcomes, policy="failure") == [0, 1]
+    assert select_sft_examples(outcomes, policy="failure", drop_gold_empty=True) == [0]
+    assert select_sft_examples(outcomes, policy="all", drop_gold_empty=True) == [0]

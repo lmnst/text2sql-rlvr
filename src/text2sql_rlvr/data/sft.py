@@ -15,12 +15,125 @@ mismatch that shows up much later as a mysteriously low score.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import random
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from text2sql_rlvr.data.bird import BirdExample
 from text2sql_rlvr.data.prompt import PromptConfig, build_messages
 from text2sql_rlvr.sql import extract_sql
+
+#: How training questions are chosen out of an evaluated pool.
+#:
+#: ``all`` keeps everything. ``random`` is the control: a plain sample, used to
+#: show whether a targeted set beats an equally large arbitrary one. ``failure``
+#: is the targeted policy: questions the current model answered wrong, plus a
+#: ``replay_fraction`` share of questions it answered right so the model is not
+#: trained exclusively on its own failure distribution.
+SELECTION_POLICIES = ("all", "random", "failure")
+
+
+def _round_robin(
+    ids_by_db: Mapping[str, list[int]], limit: int, cap_per_db: int
+) -> list[int]:
+    """Take ids one database at a time, so no large database dominates."""
+    remaining = {db: list(ids) for db, ids in ids_by_db.items() if ids}
+    taken: list[int] = []
+    per_db: dict[str, int] = defaultdict(int)
+    while remaining and (limit <= 0 or len(taken) < limit):
+        progressed = False
+        for db in sorted(remaining):
+            if limit > 0 and len(taken) >= limit:
+                break
+            if cap_per_db > 0 and per_db[db] >= cap_per_db:
+                remaining.pop(db, None)
+                continue
+            taken.append(remaining[db].pop())
+            per_db[db] += 1
+            progressed = True
+            if not remaining[db]:
+                remaining.pop(db)
+        if not progressed:
+            break
+    return taken
+
+
+def select_sft_examples(
+    outcomes: Sequence[Mapping[str, object]],
+    *,
+    policy: str = "all",
+    size: int = 0,
+    replay_fraction: float = 0.0,
+    cap_per_db: int = 0,
+    drop_gold_empty: bool = False,
+    seed: int = 0,
+) -> list[int]:
+    """Choose which question ids to train on, given how a model scored on them.
+
+    ``outcomes`` are the per-question records evaluate.py writes; only
+    ``question_id``, ``db_id``, ``official`` and ``gold_empty`` are read.
+    ``size`` of 0 keeps everything the policy allows. Selection is round-robin
+    over databases: seeing many schemas matters more than seeing many questions
+    from the one database that happens to be largest.
+
+    ``drop_gold_empty`` skips questions whose gold SQL returns no rows. On BIRD
+    train that is 265 of 8191; their gold teaches the model to answer with
+    nothing, and several are simply mislabelled.
+    """
+    if policy not in SELECTION_POLICIES:
+        raise ValueError(f"policy must be one of {SELECTION_POLICIES}, got {policy!r}")
+    if not 0.0 <= replay_fraction <= 1.0:
+        raise ValueError(f"replay_fraction must be within [0, 1], got {replay_fraction}")
+    if policy != "failure" and replay_fraction:
+        raise ValueError("replay_fraction only applies to the 'failure' policy")
+
+    rng = random.Random(seed)
+    solved: dict[str, list[int]] = defaultdict(list)
+    failed: dict[str, list[int]] = defaultdict(list)
+    for record in outcomes:
+        if drop_gold_empty and record.get("gold_empty"):
+            continue
+        target = solved if record["official"] else failed
+        target[str(record["db_id"])].append(int(record["question_id"]))
+    for group in (solved, failed):
+        for ids in group.values():
+            rng.shuffle(ids)
+
+    if policy == "failure":
+        n_replay = round(size * replay_fraction) if size else 0
+        primary = _round_robin(failed, size - n_replay if size else 0, cap_per_db)
+        replay = _round_robin(solved, n_replay, cap_per_db) if n_replay else []
+        return sorted(primary + replay)
+
+    everything: dict[str, list[int]] = defaultdict(list)
+    for group in (solved, failed):
+        for db, ids in group.items():
+            everything[db].extend(ids)
+    for ids in everything.values():
+        rng.shuffle(ids)
+    return sorted(_round_robin(everything, size, cap_per_db))
+
+
+def selection_report(
+    selected: Sequence[int], outcomes: Sequence[Mapping[str, object]]
+) -> dict[str, object]:
+    """What the selection actually contains, for the dataset manifest."""
+    by_id = {int(r["question_id"]): r for r in outcomes}
+    chosen = [by_id[i] for i in selected if i in by_id]
+    per_db: dict[str, int] = defaultdict(int)
+    for record in chosen:
+        per_db[str(record["db_id"])] += 1
+    counts = sorted(per_db.values())
+    return {
+        "n": len(selected),
+        "n_databases": len(per_db),
+        "n_from_failures": sum(1 for r in chosen if not r["official"]),
+        "n_from_solved": sum(1 for r in chosen if r["official"]),
+        "per_db_min": counts[0] if counts else 0,
+        "per_db_max": counts[-1] if counts else 0,
+        "questions_per_db": dict(sorted(per_db.items())),
+    }
 
 
 def format_target(gold_sql: str) -> str:

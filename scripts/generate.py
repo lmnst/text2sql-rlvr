@@ -61,6 +61,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--top-p", type=float, default=1.0)
     parser.add_argument("--max-tokens", type=int, default=512)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n-samples", type=int, default=1,
+                        help="draw this many completions per question in one request; the "
+                             "prompt is prefilled once, so k samples cost far less than k runs")
     parser.add_argument(
         "--thinking",
         action="store_true",
@@ -105,6 +108,12 @@ def load_done(path: Path) -> set[int]:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+
+    if args.n_samples < 1:
+        raise SystemExit("--n-samples must be at least 1")
+    if args.n_samples > 1 and args.temperature <= 0:
+        raise SystemExit("--n-samples above 1 needs --temperature above 0, or the "
+                         "samples are k copies of one answer")
 
     config = PromptConfig(
         schema_style=args.schema_style,
@@ -195,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
             "top_p": args.top_p,
             "max_tokens": args.max_tokens,
             "seed": args.seed,
+            "n": args.n_samples,
             **body_extra,
         }
         started = time.monotonic()
@@ -204,12 +214,18 @@ def main(argv: list[str] | None = None) -> int:
                 response = client.post("/chat/completions", json=payload)
                 response.raise_for_status()
                 data = response.json()
-                choice = data["choices"][0]
+                choices = data["choices"]
+                completions = [c["message"]["content"] or "" for c in choices]
                 return {
                     "question_id": example.question_id,
                     "db_id": example.db_id,
-                    "completion": choice["message"]["content"] or "",
-                    "finish_reason": choice.get("finish_reason"),
+                    # The first sample stays under the old keys so the scorer
+                    # and every existing predictions file keep working; the rest
+                    # only appear when more than one was asked for.
+                    "completion": completions[0],
+                    "finish_reason": choices[0].get("finish_reason"),
+                    "completions": completions if args.n_samples > 1 else None,
+                    "n_returned": len(completions),
                     "usage": data.get("usage", {}),
                     "latency_s": round(time.monotonic() - started, 3),
                     "error": None,
@@ -228,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
             "db_id": example.db_id,
             "completion": "",
             "finish_reason": None,
+            "completions": [] if args.n_samples > 1 else None,
+            "n_returned": 0,
             "usage": {},
             "latency_s": round(time.monotonic() - started, 3),
             "error": last_error,
@@ -240,14 +258,22 @@ def main(argv: list[str] | None = None) -> int:
 
     failures = 0
     fallbacks = 0
+    short = 0
     try:
         with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
             for done, record in enumerate(pool.map(generate, todo), start=1):
                 record["sql"] = extract_sql(record["completion"])
+                completions = record.pop("completions")
+                if completions is not None:
+                    record["samples"] = [
+                        {"completion": text, "sql": extract_sql(text)} for text in completions
+                    ]
                 if record["error"]:
                     failures += 1
                 if selected is not None and record["schema_mode"] != "predicted":
                     fallbacks += 1
+                if not record["error"] and record["n_returned"] < args.n_samples:
+                    short += 1
                 with write_lock:
                     handle.write(json.dumps(record, ensure_ascii=False) + "\n")
                     handle.flush()
@@ -269,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
             "max_tokens": args.max_tokens,
             "seed": args.seed,
             "thinking": args.thinking,
+            "n_samples": args.n_samples,
         },
         "prompt_config": config.as_dict(),
         "schema_selection": {
@@ -284,6 +311,7 @@ def main(argv: list[str] | None = None) -> int:
             "n_fallback": fallbacks,
         },
         "request_failures": failures,
+        "short_responses": short,
     }
     meta_path = args.out.with_suffix(args.out.suffix + ".meta.json")
     meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -292,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"meta  {meta_path}")
     if selected is not None:
         print(f"selector fallback to '{args.selected_fallback}' schema: {fallbacks} questions")
+    if short:
+        print(f"WARNING: {short} questions came back with fewer than {args.n_samples} samples")
     if failures:
         print(f"WARNING: {failures} requests failed after retries")
     return 0

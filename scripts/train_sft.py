@@ -1,20 +1,25 @@
-"""Lightweight LoRA SFT for Qwen3-1.7B on BIRD, using transformers + peft.
+"""Lightweight LoRA SFT for Qwen3 on BIRD, using transformers + peft.
 
 Replicates the LLaMA-Factory config (configs/sft/qwen3_1.7b_lora.yaml) without
 pulling in LLaMA-Factory itself, so the carefully-tuned verl environment is not
 disturbed. The prompt/chat-template contract is the same one generate.py and
 vLLM use: qwen3 template with enable_thinking=False.
 
+Loss is taken on every assistant turn, not only the final one, so multi-turn
+trajectories train the way they read; the span logic and its tests live in
+text2sql_rlvr.masking.
+
     python scripts/train_sft.py \
-        --model /root/autodl-tmp/Qwen3-1.7B \
+        --model /root/autodl-tmp/Qwen3-4B \
         --data /root/autodl-tmp/sft_data/sft_train.jsonl \
-        --out /root/autodl-tmp/out/qwen3-1.7b-sft-lora
+        --out /root/autodl-tmp/out/qwen3-4b-sft-lora
 """
 
 from __future__ import annotations
 
 import argparse
 
+import _bootstrap  # noqa: F401
 import torch
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model
@@ -24,6 +29,8 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+
+from text2sql_rlvr.masking import mask_assistant_turns
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,37 +71,35 @@ def main() -> int:
     model.enable_input_require_grads()
 
     def tokenize(example: dict) -> dict:
-        """Tokenize one chat example, masking the prompt so loss is answer-only."""
-        messages = example["messages"]
-        # Prompt ids: everything up to and including the assistant role marker.
-        # tokenize=False + encode keeps a plain list[int] regardless of the
-        # transformers version's return shape.
-        prompt_text = tokenizer.apply_chat_template(
-            messages[:-1],
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False,
+        """Tokenize one chat, keeping loss on the assistant turns only."""
+        masked = mask_assistant_turns(
+            tokenizer, example["messages"], max_length=args.max_length
         )
-        full_text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=False,
-            enable_thinking=False,
-        )
-        prompt_ids = tokenizer.encode(prompt_text, add_special_tokens=False)
-        full_ids = tokenizer.encode(full_text, add_special_tokens=False)
-        if len(full_ids) > args.max_length:
-            full_ids = full_ids[: args.max_length]
-        labels = [-100] * len(full_ids)
-        # The answer occupies full_ids[len(prompt_ids):], provided the prompt is
-        # a prefix of the full sequence. When truncation cut into the answer we
-        # still mask whatever remained of the prompt.
-        answer_start = min(len(prompt_ids), len(full_ids))
-        labels[answer_start:] = full_ids[answer_start:]
-        return {"input_ids": full_ids, "labels": labels}
+        return {
+            "input_ids": masked.input_ids,
+            "labels": masked.labels,
+            "n_turns": masked.n_assistant_turns,
+            "n_supervised": masked.n_supervised_tokens,
+            "truncated": masked.truncated,
+        }
 
     dataset = load_dataset("json", data_files=args.data, split="train")
     dataset = dataset.map(tokenize, remove_columns=dataset.column_names)
+
+    # Report the mask before training on it. An example whose answer was cut off
+    # by --max-length contributes no gradient at all, and a turn count of 1 on
+    # data that was meant to be trajectories means the file is not what the
+    # command assumes it is -- both are invisible once training starts.
+    turns, supervised = dataset["n_turns"], dataset["n_supervised"]
+    truncated = sum(dataset["truncated"])
+    kept = dataset.filter(lambda example: example["n_supervised"] > 0)
+    dropped = len(dataset) - len(kept)
+    print(f"examples       {len(kept)} trained, {dropped} dropped with no answer tokens left")
+    print(f"assistant turns per example   min {min(turns)} max {max(turns)}")
+    print(f"supervised tokens             total {sum(supervised)}, "
+          f"mean {sum(supervised) / max(len(supervised), 1):.1f}")
+    print(f"truncated at {args.max_length} tokens    {truncated} examples")
+    dataset = kept.remove_columns(["n_turns", "n_supervised", "truncated"])
 
     training_args = TrainingArguments(
         output_dir=args.out,

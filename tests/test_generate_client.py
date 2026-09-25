@@ -35,6 +35,7 @@ class _Stub(ThreadingHTTPServer):
     requests: list[dict] = []
     fail_first = 0
     reply_sql = "SELECT count(*) FROM staff"
+    max_choices = 0  # 0 honours the requested n; a smaller number returns fewer
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -52,14 +53,23 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(b"{}")
             return
 
+        # vLLM answers a request with n>1 by returning n choices, so the stub
+        # does too: the first is the canned answer, the rest are distinguishable.
+        wanted = int(body.get("n", 1))
+        if self.server.max_choices:
+            wanted = min(wanted, self.server.max_choices)
+        sqls = [self.server.reply_sql] + [
+            f"SELECT {i} FROM staff" for i in range(1, wanted)
+        ]
         payload = {
             "choices": [
                 {
-                    "message": {"content": f"```sql\n{self.server.reply_sql}\n```"},
+                    "message": {"content": f"```sql\n{sql}\n```"},
                     "finish_reason": "stop",
                 }
+                for sql in sqls[:wanted]
             ],
-            "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5 * wanted},
         }
         encoded = json.dumps(payload).encode()
         self.send_response(200)
@@ -75,6 +85,7 @@ def server():
     httpd.requests = []
     httpd.fail_first = 0
     httpd.reply_sql = "SELECT count(*) FROM staff"
+    httpd.max_choices = 0
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
@@ -218,3 +229,94 @@ def test_selected_tables_override_schema_and_fall_back_when_missing(
     assert meta["schema_selection"]["mode"] == "predicted"
     assert meta["schema_selection"]["n_fallback"] == 2
     assert meta["schema_selection"]["fallback_mode"] == "full"
+
+
+class TestSampling:
+    """k samples per question, in one request.
+
+    The point of --n-samples is DPO mining: a question is only useful when the
+    model gets it right sometimes and wrong other times, which needs several
+    answers to the same prompt. One request with n=k reuses the prefill, and on
+    these prompts the prefill is the expensive part.
+    """
+
+    def test_one_sample_by_default_and_no_extra_field(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        out = tmp_path / "preds.jsonl"
+        run(generate_module, server, bird_root, out, "--limit", "1")
+
+        assert server.requests[0]["n"] == 1
+        record = read(out)[0]
+        assert record["n_returned"] == 1
+        assert "samples" not in record
+
+    def test_k_samples_arrive_in_one_request(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        out = tmp_path / "preds.jsonl"
+        run(generate_module, server, bird_root, out, "--limit", "1",
+            "--n-samples", "8", "--temperature", "0.8")
+
+        assert len(server.requests) == 1
+        assert server.requests[0]["n"] == 8
+
+        record = read(out)[0]
+        assert record["n_returned"] == 8
+        assert len(record["samples"]) == 8
+
+    def test_every_sample_is_parsed_back_to_sql(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        out = tmp_path / "preds.jsonl"
+        run(generate_module, server, bird_root, out, "--limit", "1",
+            "--n-samples", "3", "--temperature", "0.8")
+
+        samples = read(out)[0]["samples"]
+        assert [s["sql"] for s in samples] == [
+            "SELECT count(*) FROM staff", "SELECT 1 FROM staff", "SELECT 2 FROM staff"
+        ]
+
+    def test_the_first_sample_stays_where_the_scorer_looks(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        """evaluate.py reads `completion`; a sampling run must still be scorable."""
+        out = tmp_path / "preds.jsonl"
+        run(generate_module, server, bird_root, out, "--limit", "1",
+            "--n-samples", "4", "--temperature", "0.8")
+
+        record = read(out)[0]
+        assert record["completion"] == record["samples"][0]["completion"]
+        assert record["sql"] == "SELECT count(*) FROM staff"
+
+    def test_sampling_at_temperature_zero_is_refused(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        """k identical answers cost k times as much and mine nothing."""
+        with pytest.raises(SystemExit):
+            run(generate_module, server, bird_root, tmp_path / "preds.jsonl",
+                "--n-samples", "8")
+
+    def test_meta_records_the_sample_count(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        out = tmp_path / "preds.jsonl"
+        run(generate_module, server, bird_root, out, "--limit", "1",
+            "--n-samples", "2", "--temperature", "0.8")
+
+        meta = json.loads(out.with_suffix(".jsonl.meta.json").read_text(encoding="utf-8"))
+        assert meta["decoding"]["n_samples"] == 2
+        assert meta["short_responses"] == 0
+
+    def test_a_server_returning_fewer_samples_is_counted(
+        self, generate_module, server, bird_root, tmp_path
+    ):
+        """Mining from 2 samples when 8 were asked for skews every rate computed later."""
+        server.max_choices = 2
+        out = tmp_path / "preds.jsonl"
+        run(generate_module, server, bird_root, out, "--limit", "1",
+            "--n-samples", "8", "--temperature", "0.8")
+
+        assert read(out)[0]["n_returned"] == 2
+        meta = json.loads(out.with_suffix(".jsonl.meta.json").read_text(encoding="utf-8"))
+        assert meta["short_responses"] == 1
