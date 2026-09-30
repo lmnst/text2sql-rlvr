@@ -1,20 +1,19 @@
 # Text2SQL-RLVR
 
-An execution-grounded Text-to-SQL pipeline built with Qwen3-1.7B, LoRA SFT, verl GRPO,
-vLLM, and SQLite. Generated SQL is executed against read-only BIRD databases, and the
-execution result is used for both evaluation and reinforcement-learning reward.
+An execution-grounded Text-to-SQL post-training system built on BIRD, Qwen3, LoRA, vLLM
+and SQLite. Every query the model writes is executed against a read-only database, and
+that execution is used three ways: as the reward during reinforcement learning, as the
+filter that decides which training data is worth keeping, and as a tool the model itself
+calls before committing to an answer.
 
-## Final status
+## Status
 
-The complete path is implemented and tested:
+The infrastructure is complete and tested. The generator model is being rebuilt on
+Qwen3-4B after the earlier 1.7B checkpoints were lost, so the headline accuracy numbers
+below are still the August 1.7B ones.
 
-```text
-BIRD data -> schema-aware prompt -> LoRA SFT -> vLLM rollout
-          -> read-only SQL execution -> official/strict scoring -> GRPO
-```
-
-The main controlled result is schema selection, not GRPO. All reportable rows below come
-from a clean Git commit and have a unique entry in `results/runs.jsonl`.
+Results so far, each traceable to a unique line in `results/runs.jsonl`. Four of the five
+come from a clean commit and are reportable; the baseline row does not, see the note below:
 
 | Model / prompt | Split | n | BIRD official EX | Strict EX | run_id |
 |---|---|---:|---:|---:|---|
@@ -29,12 +28,41 @@ Only rows on the same split are direct comparisons:
 - Linked schema improves the strong SFT checkpoint from 32.87% to 37.94% official EX.
 - GRPO changes linked-schema official EX from 37.94% to 38.20%. This is treated as no
   clear additional improvement, not as a successful RL gain.
-- The 788-example set is a fixed validation split derived from BIRD train. BIRD dev was
-  not used for tuning, checkpoint selection, or the numbers above.
+- The 788-example set is a fixed validation split derived from BIRD train, chosen so its
+  three databases appear nowhere in training. BIRD dev has never been read, for tuning or
+  for anything else.
 
-See [the final experiment report](docs/FINAL_REPORT.md) for the design, paired analysis,
-limitations, and interpretation. The chronological record, including failed and superseded
-experiments, is kept in [PROGRESS.md](docs/PROGRESS.md).
+**The baseline row is flawed and is marked as such.** `43bb66bbe1e8` carries
+`git_dirty=true` in the ledger, so by this project's own rule it is not a reportable
+number. It had been quoted as clean since August; the ledger review on 2026-09-16 caught
+it. The remedy is cheap and needs no GPU: `results/preds/base_minidev.jsonl` still exists,
+so re-scoring it on a clean tree produces a clean row. Until then the "19.80% to 34.60%"
+claim rests on a dirty starting point.
+
+Work since then runs on a dirty working tree and is therefore internal evidence only, not
+reportable: the trained schema selector, the move to Qwen3-4B, and the agent loop. It is
+all written up in [the project story](docs/PROJECT_STORY.md), with the day-by-day record
+in [PROGRESS.md](docs/PROGRESS.md) and the August analysis in
+[the final report](docs/FINAL_REPORT.md).
+
+## Two results worth knowing before reading the code
+
+**Schema selection is settled, and a trained selector did not beat a twenty-line linker.**
+A lexical linker that keeps any table sharing a word with the question reached 99% per-table
+recall by keeping 25 of 42 tables. Training a model to do better worked on its own terms:
+it keeps the gold tables for 95% of questions while handing over 3 to 8 tables instead of
+25. The SQL generator scored the same either way. Cutting a database from 42 tables to 25
+is worth about 3 points of execution accuracy; cutting it further is worth nothing. The
+oracle's remaining 6 points come from handing over exactly the gold tables and no others,
+which leaks the join structure and no real selector can reproduce.
+
+**Execution feedback fixes crashes, not misunderstandings.** Letting the model run a query,
+read the result or the error, and revise cut execution failures from 142 to 55 out of 788.
+Accuracy did not move, because three quarters of the failures are queries that execute
+perfectly and return the wrong rows: `COUNT(*)` where the question needed
+`COUNT(DISTINCT ...)`, a missing `LIMIT 1`. An executor has no reason to complain about
+those. The loop does help where the model has to work: on questions it takes three or four
+turns to answer it beats single-shot generation.
 
 ## Why two execution metrics
 
@@ -47,20 +75,24 @@ Every evaluation reports two scores over the same predictions:
   result semantics.
 
 The two metrics are deliberately not collapsed into one. Training is aligned with the final
-BIRD scorer, while the stricter result exposes possible metric exploitation.
+BIRD scorer, while the stricter result exposes possible metric exploitation. It found 933
+answers that omit a required de-duplication and are credited anyway.
 
-## Schema linking
+## The agent loop
 
-`generate.py` and the RL data builder support three schema modes:
+`src/text2sql_rlvr/agent.py` is an execute-observe-revise loop in about a hundred lines
+over pieces the project already has. One action per reply, a hard turn budget, and a
+plain-text protocol any chat model can follow without native tool calling:
 
-- `full`: include the complete database schema;
-- `linked`: select tables using question/evidence terms and retain foreign-key neighbours;
-- `oracle`: include gold-SQL tables for diagnosis only, never for training or deployment.
+```text
+DESCRIBE <table>       the table's definition and a few example rows
+a sql code block       the query is executed; its result or its error comes back
+FINAL + a sql block    this query is the answer; the loop stops
+```
 
-Exact tokenizer diagnostics showed that the full prompt was not being truncated. The linked
-prompt helped because it removed irrelevant schema context, although the lightweight linker
-still misses some required tables and retains many distractors. It is a measured baseline,
-not a claim that schema linking is solved.
+Observations are appended as ordinary conversation turns, so a trajectory is a chat
+transcript: it can be scored like any other prediction, or used as training data with the
+loss restricted to the model's own turns. No agent framework is involved.
 
 ## Safety and reproducibility
 
@@ -107,26 +139,32 @@ python scripts/evaluate.py \
   --stage ablation
 ```
 
-GPU dependencies are isolated in `requirements-train.txt`. The validated GRPO configuration and
-the observed Blackwell workarounds are documented in [docs/grpo-runbook.md](docs/grpo-runbook.md).
+GPU dependencies are isolated in `requirements-train.txt`, pinned as a set that is known to work
+together; the Blackwell workarounds it needed are documented there and in
+[docs/grpo-runbook.md](docs/grpo-runbook.md). Neither TRL nor LLaMA-Factory is used: the SFT and
+DPO trainers are single files over transformers and peft, so that environment stays undisturbed.
 
 ## Repository layout
 
 ```text
-configs/                      SFT and GRPO configurations
-scripts/                      Data, generation, evaluation, diagnostics, checkpoint export
-src/text2sql_rlvr/sql/        SQL extraction and read-only validation
-src/text2sql_rlvr/data/       BIRD loading, schema introspection, prompts, schema linking
-src/text2sql_rlvr/rewards/    SQLite sandbox and execution verifiers
-src/text2sql_rlvr/eval/       Execution Accuracy and per-example outcomes
-src/text2sql_rlvr/ledger.py   Append-only experiment ledger
-tests/                        Unit and adversarial tests using temporary SQLite databases
-docs/                         Runbooks, final report, resume draft, milestone history
-results/runs.jsonl            Tracked, append-only metric ledger
+configs/                      split manifests, SFT / GRPO / DPO / selector dataset manifests
+scripts/                      data, generation, evaluation, agent, training, export, diagnostics
+src/text2sql_rlvr/sql/        SQL extraction, read-only validation, lexical scanning
+src/text2sql_rlvr/data/       BIRD loading, schema introspection, prompts, schema linking,
+                              SFT and preference data construction, selector data
+src/text2sql_rlvr/rewards/    SQLite sandbox, result normalisation and comparison, rewards
+src/text2sql_rlvr/eval/       Execution Accuracy, per-example outcomes, failure analysis
+src/text2sql_rlvr/agent.py    execute-observe-revise loop
+src/text2sql_rlvr/ledger.py   append-only experiment ledger
+tests/                        357 unit and end-to-end tests on temporary SQLite databases
+docs/                         project story, progress record, report, runbooks, analyses
+results/runs.jsonl            tracked, append-only metric ledger
 ```
 
 ## Scope of the claim
 
-This repository demonstrates a reproducible Text-to-SQL RLVR system and a controlled schema-linking
-improvement. It does **not** claim that the ordinary GRPO run produced a meaningful accuracy gain,
-that the lightweight linker is optimal, or that the reported train-val results are BIRD dev scores.
+This repository demonstrates a reproducible execution-grounded Text-to-SQL system and one
+controlled improvement, schema linking. It does **not** claim that GRPO produced a meaningful
+gain, that the trained schema selector beat the lexical one, that the agent loop improved
+accuracy, or that any number here is a BIRD dev score. Where an experiment came out negative
+it is written up as a negative result, with the diagnosis that follows from it.

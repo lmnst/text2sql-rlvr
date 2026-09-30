@@ -31,6 +31,16 @@ Thumbs.db
 /outputs/
 /logs/
 
+# Internal working notes: kept locally, not published
+/AGENTS.md
+/HANDOFF.md
+/docs/*
+!/docs/.gitkeep
+!/docs/data.md
+!/docs/analysis/
+/docs/analysis/*.md
+/configs/checkpoints/README.md
+
 # Generated experiment artifacts
 results/*
 !results/.gitkeep
