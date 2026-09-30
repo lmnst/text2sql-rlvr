@@ -83,7 +83,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--thinking", action="store_true",
-                        help="enable Qwen3 thinking mode (off by default; see AGENTS.md)")
+                        help="enable Qwen3 thinking mode (off by default, matching training)")
 
     parser.add_argument("--limit", type=int, default=0, help="first N questions, 0 for all")
     parser.add_argument("--resume", action="store_true",

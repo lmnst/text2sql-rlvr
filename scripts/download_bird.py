@@ -5,7 +5,7 @@
 Start with mini_dev (500 questions, 11 databases). Only fetch dev when you are
 ready to report a number, and train when you are ready to do SFT -- both are
 much larger, and dev in particular should be touched as rarely as possible
-(see "数据划分纪律" in AGENTS.md).
+because it is held out for the final evaluation.
 
 BIRD ships the databases as a zip *inside* the outer zip, so unpacking is two
 passes. Downloads resume: rerun after a dropped connection and it continues.

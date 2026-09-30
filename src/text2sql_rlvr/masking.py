@@ -75,7 +75,7 @@ def mask_assistant_turns(
     those rather than training on a sequence that teaches nothing.
 
     ``enable_thinking`` is passed to the chat template and must match what
-    generation sends (this project keeps it off, see AGENTS.md).
+    generation sends (this project keeps it off).
     """
     if not messages:
         raise ValueError("messages is empty")

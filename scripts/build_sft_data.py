@@ -49,7 +49,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, default=Path("configs/sft/dataset.json"))
 
     parser.add_argument("--instruction-version", choices=("v1", "v2"), default="v1",
-                        help="v1 is the frozen prompt; see milestone 7 in docs/PROGRESS.md")
+                        help="v1 is the frozen prompt; v2 measured worse on the validation set")
     parser.add_argument("--schema-style", choices=("ddl", "compact"), default="ddl")
     parser.add_argument("--schema-mode", choices=tuple(m for m in SCHEMA_MODES if m != "oracle"),
                         default="full",

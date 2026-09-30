@@ -67,7 +67,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--thinking",
         action="store_true",
-        help="enable Qwen3 thinking mode (off by default; see AGENTS.md)",
+        help="enable Qwen3 thinking mode (off by default, matching training)",
     )
 
     parser.add_argument("--schema-style", choices=("ddl", "compact"), default="ddl")
@@ -89,7 +89,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--instruction-version", choices=("v1", "v2"), default="v1",
                         help="v1 is the pinned prompt (SFT and RL train with it); "
                              "v2 adds dialect and pseudo-function rules but measured "
-                             "worse on the validation set (see docs/PROGRESS.md)")
+                             "worse on the validation set")
 
     parser.add_argument("--limit", type=int, default=0, help="first N examples, 0 for all")
     parser.add_argument("--resume", action="store_true", help="skip ids already in --out")

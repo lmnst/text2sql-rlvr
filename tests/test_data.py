@@ -164,7 +164,7 @@ class TestPrompt:
 
 
 class TestInstructionVersions:
-    """v1 is the pinned prompt since milestone 7; v2 is kept for the negative result."""
+    """v1 is the pinned prompt; v2 is kept for the negative result."""
 
     def test_default_is_v1(self):
         assert PromptConfig().instruction_version == "v1"

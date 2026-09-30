@@ -23,7 +23,7 @@ INSTRUCTION_V1 = (
 )
 
 #: v2 adds three rules, each one earned by a failure mode measured on real output
-#: rather than guessed at. See the milestone 6 entry in docs/PROGRESS.md.
+#: rather than guessed at.
 #:
 #: * BIRD's external knowledge is written with pseudo-functions -- ``DIVIDE(a, b)``,
 #:   ``SUBTRACT(a, b)`` -- which the model copied verbatim into SQL. That is
@@ -51,9 +51,8 @@ INSTRUCTION_V2 = (
 
 INSTRUCTIONS = {"v1": INSTRUCTION_V1, "v2": INSTRUCTION_V2}
 
-#: Back-compat name for the current default. v1 is the pinned prompt since
-#: milestone 7 (v2 was measured and rejected on the validation set); see
-#: docs/PROGRESS.md.
+#: Back-compat name for the current default. v1 is the pinned prompt; v2 was
+#: measured and rejected on the validation set.
 INSTRUCTION = INSTRUCTION_V1
 
 

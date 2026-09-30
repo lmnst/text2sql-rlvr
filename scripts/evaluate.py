@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"ledger               {args.ledger} (run_id={entry['run_id']})")
     if entry["git_dirty"]:
-        print("WARNING: working tree is dirty; this run is not reportable (see AGENTS.md)")
+        print("WARNING: working tree has uncommitted changes; the ledger records git_dirty=true")
     return 0
 
 

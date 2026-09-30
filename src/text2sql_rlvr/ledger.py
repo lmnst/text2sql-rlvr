@@ -2,7 +2,7 @@
 
 Every number that leaves this project has to be traceable to one line here, so
 the fields that make a result reproducible are filled in automatically rather
-than remembered. See the "实验记录" section of AGENTS.md.
+than remembered.
 """
 
 from __future__ import annotations
